@@ -29,6 +29,7 @@ object ConformerPipeline extends Logging {
   val VINA_DOCKING_URL = "http://pele.farmbio.uu.se/cpvs-vina/multivina.sh"
   val VINA_CONF_URL = "http://pele.farmbio.uu.se/cpvs-vina/conf.txt"
   val VINA_HOME = "http://pele.farmbio.uu.se/cpvs-vina/"
+  val OBABEL_HOME_URL = "http://pele.farmbio.uu.se/cpvs-vina/"
   //The Spark built-in pipe splits molecules line by line, we need a custom one
   private[vs] def pipeString(str: String, command: List[String]) = {
 
@@ -75,18 +76,34 @@ object ConformerPipeline extends Logging {
       VINA_CONF_URL
     }
     
+    //Use local vina conf.txt file if VINA_CONF is set
+    val obabelPath = if (System.getenv("OBABEL_HOME") != null) {
+      logInfo("JOB_INFO: using local obabel: " + System.getenv("OBABEL_HOME"))
+      System.getenv("OBABEL_HOME")
+    } else {
+      logInfo("JOB_INFO: using remote obabel: " + OBABEL_HOME_URL)
+      OBABEL_HOME_URL
+    }
+    
     sc.addFile(vinaConfPath)
     sc.addFile(vinaDockingPath)
     sc.addFile(receptorPath)
+    sc.addFile(obabelPath)
     val receptorFileName = Paths.get(receptorPath).getFileName.toString
     val dockingstdFileName = Paths.get(vinaDockingPath).getFileName.toString
     val confFileName = Paths.get(vinaConfPath).getFileName.toString
-    val pipedRDD = rdd.map { sdf =>
-      ConformerPipeline.pipeString(sdf,
+    val obabelFileName = Paths.get(obabelPath).getFileName.toString
+    val dockedRDD = rdd.map { pdbqt =>
+      ConformerPipeline.pipeString(pdbqt,
         List(SparkFiles.get(dockingstdFileName),"--receptor",
           SparkFiles.get(receptorFileName), "--config", SparkFiles.get(confFileName)))
     }
-    pipedRDD
+    val obabeledRDD = dockedRDD.map { pdbqtWithScores =>
+      ConformerPipeline.pipeString(pdbqtWithScores,
+        List(SparkFiles.get(obabelFileName),"-i", "pdbqt", "-o", "sdf"))
+    }
+    
+    obabeledRDD
   }
 
   private def sdfStringToIAtomContainer(sdfRecord: String) = {
@@ -101,7 +118,7 @@ object ConformerPipeline extends Logging {
 
     res //return the molecule
   }
-
+  
   private def writeSignature(sdfRecord: String, signature: String) = {
     val it = SBVSPipeline.CDKInit(sdfRecord)
     val strWriter = new StringWriter()
@@ -115,6 +132,38 @@ object ConformerPipeline extends Logging {
     writer.close
     strWriter.toString() //return the molecule  
   }
+  
+  private def cleanPoses(sdfRecord: String) = {
+    val it = SBVSPipeline.CDKInit(sdfRecord)
+    val strWriter = new StringWriter()
+    val writer = new SDFWriter(strWriter)
+    var res: String = null
+    while (it.hasNext()) {
+      val mol = it.next
+      res = mol.getProperty("REMARK")
+      
+      //Fetching Score from pdbqt REMARK to create sdf score tag
+      val scorePattern = ("[+-]?[0-9]+(\\.[0-9]+)?").r
+      val score = scorePattern.findFirstIn(res).fold("")(_.toString)
+      mol.setProperty("Score", score)
+      
+      //Fetching title from pdbqt Name REMARK to create sdf title tag
+      val title = res.slice(res.indexOf("=")+2, res.indexOf("x")).trim
+      mol.setProperty("cdk:Title", title)
+      
+      //Removing pdbqt junk after getting useful stuff HEHEHE
+      mol.removeProperty("REMARK")
+      mol.removeProperty("TORSDO")
+      
+      //Removing cdk junk 
+      mol.removeProperty("cdk:Remark")
+      
+      //Writing clean mol
+      writer.write(mol)
+    }
+    writer.close
+    strWriter.toString() //return the molecule  
+  }
 
 }
 
@@ -123,7 +172,10 @@ private[vs] class ConformerPipeline(override val rdd: RDD[String])
 
   override def dock(receptorPath: String, dockTimePerMol: Boolean) = {
     val pipedRDD = ConformerPipeline.getDockingRDD(receptorPath, dockTimePerMol, sc, rdd)
-    val res = pipedRDD.flatMap(SBVSPipeline.splitPDBmolecules)
+    val cleanRDD = pipedRDD.map{
+      case (dirtyMol) => ConformerPipeline.cleanPoses(dirtyMol)  
+    }
+    val res = cleanRDD.flatMap(SBVSPipeline.splitSDFmolecules)
     new PosePipeline(res)
   }
 

@@ -11,6 +11,7 @@ import se.uu.farmbio.parsers.PDBInputFormat
 import se.uu.farmbio.parsers.SmilesInputFormat
 
 import org.openscience.cdk.io.MDLV2000Reader
+import org.openscience.cdk.io.PDBReader
 import org.openscience.cdk.tools.manipulator.ChemFileManipulator
 import org.openscience.cdk.silent.ChemFile
 
@@ -27,10 +28,6 @@ private[vs] object SBVSPipeline {
     molecules.trim.split("\\$\\$\\$\\$").map(_.trim + "\n\n$$$$").toList
   }
  
-  def splitPDBmolecules(molecules: String) = {
-    molecules.trim.split("ENDMDL").map(_.trim + "\nENDMDL\n").toList
-  }
-  
   //The function takes sdfRecord and returns a List of IAtomContainer
   def CDKInit(sdfRecord: String) = {
     val sdfByteArray = sdfRecord
@@ -45,6 +42,7 @@ private[vs] object SBVSPipeline {
     mols.iterator
   }
 
+  
 }
 
 private[vs] class SBVSPipeline(protected val rdd: RDD[String]) extends Logging {
@@ -55,10 +53,7 @@ private[vs] class SBVSPipeline(protected val rdd: RDD[String]) extends Logging {
 
   protected val sc = rdd.context
   protected val defaultParallelism = sc.getConf.get("spark.default.parallelism", "2").toInt
-  /*protected val oeErrorLevel =
-    sc.getConf.get("oechem.error.level", OEErrorLevel.Error.toString).toInt
-  logDebug(s"OEChem error level is: $oeErrorLevel")
-*/
+ 
   def getMolecules = rdd
 /*
   def readSmilesRDDs(smiles: Seq[RDD[String]]): SBVSPipeline with SmilesTransforms = {

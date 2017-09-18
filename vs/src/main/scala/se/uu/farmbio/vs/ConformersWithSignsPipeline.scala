@@ -62,12 +62,12 @@ object ConformersWithSignsPipeline extends Serializable {
   }
 
   private def labelTopAndBottom(
-    sdfRecord: String,
+    pdbqtRecord: String,
     score: Double,
     scoreHistogram: Array[Double],
     badIn: Int,
     goodIn: Int) = {
-    val it = SBVSPipeline.CDKInit(sdfRecord)
+    val it = SBVSPipeline.CDKInit(pdbqtRecord)
     val strWriter = new StringWriter()
     val writer = new SDFWriter(strWriter)
     while (it.hasNext()) {

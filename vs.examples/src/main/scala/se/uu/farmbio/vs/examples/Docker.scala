@@ -91,11 +91,10 @@ object Docker extends Logging {
     var poses = new SBVSPipeline(sc)
       .readConformerRDDs(Seq(sampleRDD))
       .dock(params.receptorFile, params.dockTimePerMol)
-   poses.getMolecules.saveAsTextFile("data/test")   
-   /* 
+    
     val cachedPoses = poses.getMolecules.cache()  
     cachedPoses.saveAsTextFile("data/poses")
-    
+  /*
     val res = poses.getTopPoses(params.topN)
 
     if (params.posesCheckpointPath != null) {

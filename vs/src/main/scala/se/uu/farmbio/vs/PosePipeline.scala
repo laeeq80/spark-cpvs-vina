@@ -23,71 +23,28 @@ private[vs] object PosePipeline extends Logging {
   private[vs] def parseIdAndScore(pose: String) = {
     var score: Double = Double.MinValue
     val id: String = parseId(pose)
-    /*
-    //Sometimes OEChem produce molecules with empty score or malformed molecules
-    //We use try catch block for those exceptions
-    try {
-      val methodString: String = method match {
-        case OEDockMethod.Chemgauss4 => "Chemgauss4"
-        case OEDockMethod.Chemgauss3 => "Chemgauss3"
-        case OEDockMethod.Shapegauss => "Shapegauss"
-        case OEDockMethod.Chemscore  => "Chemscore"
-        case OEDockMethod.Hybrid     => "Hybrid"
-        case OEDockMethod.Hybrid1    => "Hybrid1"
-        case OEDockMethod.Hybrid2    => "Hybrid2"
-        case OEDockMethod.PLP        => "PLP"
-      }
-      */
-     
-      var res: String = null
-      val it = SBVSPipeline.CDKInit(pose)
-      if (it.hasNext()) {
-        val mol = it.next
-        res = mol.getProperty("Score")
+    var res: String = null
+    val it = SBVSPipeline.CDKInit(pose)
+    if (it.hasNext()) {
+      val mol = it.next
+      res = mol.getProperty("Score")
 
-      }
-      score = res.toDouble
-    /*} catch {
+    }
+    score = res.toDouble
 
-      case exec: Exception => logWarning("JOB_INFO: Setting the score to Double.MinValue." +
-        "It was not possible to parse the score of the following molecule due to \n" + exec +
-        "\n" + exec.getStackTraceString + "\nPose:\n" + pose)
-
-    }*/
     (id, score)
 
   }
 
   private[vs] def parseScore(pose: String) = {
     var result: Double = Double.MinValue
-    //Sometimes OEChem produce molecules with empty score or malformed molecules
-    //We use try catch block for those exceptions
-    /*
-    try {
-      val methodString: String = method match {
-        case OEDockMethod.Chemgauss4 => "Chemgauss4"
-        case OEDockMethod.Chemgauss3 => "Chemgauss3"
-        case OEDockMethod.Shapegauss => "Shapegauss"
-        case OEDockMethod.Chemscore  => "Chemscore"
-        case OEDockMethod.Hybrid     => "Hybrid"
-        case OEDockMethod.Hybrid1    => "Hybrid1"
-        case OEDockMethod.Hybrid2    => "Hybrid2"
-        case OEDockMethod.PLP        => "PLP"
-      }*/
-      var res: String = null
-      val it = SBVSPipeline.CDKInit(pose)
-      if (it.hasNext()) {
-        val mol = it.next
-        res = mol.getProperty("Score")
-      }
-      result = res.toDouble
-    /*} catch {
-
-      case exec: Exception => logWarning("JOB_INFO: Setting the score to Double.MinValue." +
-        "It was not possible to parse the score of the following molecule due to \n" + exec +
-        "\n" + exec.getStackTraceString + "\nPose:\n" + pose)
-
-    }*/
+    var res: String = null
+    val it = SBVSPipeline.CDKInit(pose)
+    if (it.hasNext()) {
+      val mol = it.next
+      res = mol.getProperty("Score")
+    }
+    result = res.toDouble
     result
   }
 
@@ -103,6 +60,7 @@ private[vs] class PosePipeline(override val rdd: RDD[String]) extends SBVSPipeli
 
   override def getTopPoses(topN: Int) = {
     val cachedRDD = rdd.cache()
+    cachedRDD.saveAsTextFile("data/test")
     //Parsing id and Score in parallel and collecting data to driver
     val idAndScore = cachedRDD.map {
       case (mol) => PosePipeline.parseIdAndScore(mol)
@@ -126,12 +84,12 @@ private[vs] class PosePipeline(override val rdd: RDD[String]) extends SBVSPipeli
         .map(topHit => topHit == idAndScore)
         .reduce(_ || _)
     }
-        
+
     //filtering out duplicate top mols by id
-    val duplicateRemovedTopPoses = topPoses.map { mol => 
-      (PosePipeline.parseId(mol),mol)
-       }.reduceByKey((id, mol) => id).map{ case (id, mol) => mol }
-       
+    val duplicateRemovedTopPoses = topPoses.map { mol =>
+      (PosePipeline.parseId(mol), mol)
+    }.reduceByKey((id, mol) => id).map { case (id, mol) => mol }
+
     //return statement  
     duplicateRemovedTopPoses.collect
       .sortBy {
