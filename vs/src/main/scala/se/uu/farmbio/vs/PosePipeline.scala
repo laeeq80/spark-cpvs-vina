@@ -28,7 +28,6 @@ private[vs] object PosePipeline extends Logging {
     if (it.hasNext()) {
       val mol = it.next
       res = mol.getProperty("Score")
-
     }
     score = res.toDouble
 
@@ -60,7 +59,7 @@ private[vs] class PosePipeline(override val rdd: RDD[String]) extends SBVSPipeli
 
   override def getTopPoses(topN: Int) = {
     val cachedRDD = rdd.cache()
-    cachedRDD.saveAsTextFile("data/test")
+    
     //Parsing id and Score in parallel and collecting data to driver
     val idAndScore = cachedRDD.map {
       case (mol) => PosePipeline.parseIdAndScore(mol)
@@ -72,7 +71,7 @@ private[vs] class PosePipeline(override val rdd: RDD[String]) extends SBVSPipeli
         case (m, (id, score)) => m updated (id, score max m(id))
       }
         .toSeq
-        .sortBy { case (id, score) => -score }
+        .sortBy { case (id, score) => score }
         .take(topN).toArray
 
     //Broadcasting the top id and score and search main rdd
@@ -93,7 +92,7 @@ private[vs] class PosePipeline(override val rdd: RDD[String]) extends SBVSPipeli
     //return statement  
     duplicateRemovedTopPoses.collect
       .sortBy {
-        mol => -PosePipeline.parseScore(mol)
+        mol => PosePipeline.parseScore(mol)
       }
   }
 
