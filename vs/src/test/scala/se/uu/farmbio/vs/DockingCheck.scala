@@ -12,8 +12,7 @@ import org.scalatest.junit.JUnitRunner
 
 import openeye.oedocking.OEDockMethod
 import openeye.oedocking.OESearchResolution
-import se.uu.farmbio.parsers.SDFRecordReader
-import se.uu.farmbio.parsers.SmilesRecordReader
+import se.uu.farmbio.parsers.PDBRecordReader
 
 @RunWith(classOf[JUnitRunner])
 class DockingCheck extends FunSuite with BeforeAndAfterAll {
@@ -22,10 +21,8 @@ class DockingCheck extends FunSuite with BeforeAndAfterAll {
   private val conf = new SparkConf()
     .setMaster("local[*]")
     .setAppName("DockingCheck")
-    .setExecutorEnv("OE_LICENSE", System.getenv("OE_LICENSE"))
   private val sc = new SparkContext(conf)
-  sc.hadoopConfiguration.set(SDFRecordReader.SIZE_PROPERTY_NAME, "3")
-  sc.hadoopConfiguration.set(SmilesRecordReader.SIZE_PROPERTY_NAME, "3")
+  sc.hadoopConfiguration.set(PDBRecordReader.SIZE_PROPERTY_NAME, "3")
 
   test("Docking of 1000 molecules both in Parallel and serial should be same") {
 
