@@ -87,22 +87,20 @@ object Docker extends Logging {
     if (params.sampleSize < 1.0) { //Samples Data on the basis of sampleSize Parameter
       sampleRDD = sampleRDD.sample(false, params.sampleSize) //Does not take effect for complete set
     }
-   //sampleRDD.saveAsTextFile("data/sdf")
       
     var poses = new SBVSPipeline(sc)
       .readConformerRDDs(Seq(sampleRDD))
       .dock(params.receptorFile, params.dockTimePerMol)
     
-    val cachedPoses = poses.getMolecules.cache()  
-    cachedPoses.saveAsTextFile("data/sdfAfterDocking")
-  
+    val cachedPoses = poses.getMolecules.cache()
+    
     val res = poses.getTopPoses(params.topN)
 
     if (params.posesCheckpointPath != null) {
       cachedPoses.saveAsTextFile(params.posesCheckpointPath)
     }
     sc.parallelize(res, 1).saveAsTextFile(params.topPosesPath)
-
+    sc.stop()
   }
 
 }

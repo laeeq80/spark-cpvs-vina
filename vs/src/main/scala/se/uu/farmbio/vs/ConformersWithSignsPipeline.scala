@@ -141,7 +141,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       //Step 3
       //Docking the sampled dataset
       val dsDock = ConformerPipeline
-        .getDockingRDD(receptorPath, dockTimePerMol = false, sc, dsInitToDock)
+        .getDockingRDD(receptorPath, dockTimePerMol = false, sc, dsInitToDock,true)
         .flatMap(SBVSPipeline.splitSDFmolecules).persist(StorageLevel.DISK_ONLY)
         
       logInfo("JOB_INFO: Docking Completed in cycle " + counter)
@@ -241,7 +241,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
     
     val dsOnePredictedToDock = dsOnePredicted.mapPartitions(x=>Seq(x.mkString("\n")).iterator)
     
-    val dsDockOne = ConformerPipeline.getDockingRDD(receptorPath, false, sc, dsOnePredictedToDock)
+    val dsDockOne = ConformerPipeline.getDockingRDD(receptorPath, false, sc, dsOnePredictedToDock,true)
       .flatMap(SBVSPipeline.splitSDFmolecules)
 
     //Keeping rest of processed poses i.e. dsOne mol poses
