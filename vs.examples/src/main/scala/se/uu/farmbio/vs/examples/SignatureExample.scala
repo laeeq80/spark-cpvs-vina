@@ -6,6 +6,7 @@ import org.apache.spark.SparkContext
 
 import scopt.OptionParser
 import se.uu.farmbio.vs.SBVSPipeline
+import java.io.PrintWriter
 
 object SignatureExample extends Logging {
 
@@ -55,8 +56,11 @@ object SignatureExample extends Logging {
       .getMolecules
       .flatMap(SBVSPipeline.splitSDFmolecules)
       .coalesce(8, false)
-      .saveAsTextFile(params.signatureOutputFile)
-
+      .collect()
+      //.saveAsTextFile(params.signatureOutputFile)
+    val pw = new PrintWriter(params.signatureOutputFile)
+    signatures.foreach(pw.println(_))
+    pw.close
     sc.stop()
 
   }

@@ -134,18 +134,21 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       else
         dsInit = ds.sample(false, dsIncreSize / ds.count.toDouble)
 
-     logInfo("JOB_INFO: Sample taken for docking in cycle " + counter)
-      
-      val dsInitToDock = dsInit.mapPartitions(x=>Seq(x.mkString("\n")).iterator)
-   
+      logInfo("JOB_INFO: Sample taken for docking in cycle " + counter)
+
+      val dsInitToDock = dsInit.mapPartitions(x => Seq(x.mkString("\n")).iterator)
+
       //Step 3
       //Docking the sampled dataset
       val dsDock = ConformerPipeline
-        .getDockingRDD(receptorPath, dockTimePerMol = false, sc, dsInitToDock)
+        .getDockingRDD(receptorPath, dockTimePerMol = false, sc, dsInitToDock, true)
+        .map {
+          case (dirtyMol) => ConformerPipeline.cleanPoses(dirtyMol, true)
+        }
         .flatMap(SBVSPipeline.splitSDFmolecules).persist(StorageLevel.DISK_ONLY)
-        
+
       logInfo("JOB_INFO: Docking Completed in cycle " + counter)
-            
+
       //Step 4
       //Subtract the sampled molecules from main dataset
       ds = ds.subtract(dsInit)
@@ -238,17 +241,20 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
     } while (effCounter < 2 && !singleCycle)
 
     dsOnePredicted = dsOnePredicted.subtract(poses)
-    
-    val dsOnePredictedToDock = dsOnePredicted.mapPartitions(x=>Seq(x.mkString("\n")).iterator)
-    
-    val dsDockOne = ConformerPipeline.getDockingRDD(receptorPath, false, sc, dsOnePredictedToDock)
+
+    val dsOnePredictedToDock = dsOnePredicted.mapPartitions(x => Seq(x.mkString("\n")).iterator)
+
+    val dsDockOne = ConformerPipeline.getDockingRDD(receptorPath, false, sc, dsOnePredictedToDock, true)
+      .map {
+        case (dirtyMol) => ConformerPipeline.cleanPoses(dirtyMol, true)
+      }
       .flatMap(SBVSPipeline.splitSDFmolecules)
 
     //Keeping rest of processed poses i.e. dsOne mol poses
     if (poses == null)
       poses = dsDockOne
     else
-      poses = poses.union(dsDockOne)  
+      poses = poses.union(dsDockOne)
     new PosePipeline(poses)
   }
 
