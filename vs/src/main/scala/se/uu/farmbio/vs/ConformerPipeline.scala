@@ -147,7 +147,7 @@ object ConformerPipeline extends Logging {
     strWriter.toString() //return the molecule  
   }
 
-  private def cleanPoses(sdfRecord: String, signExist: Boolean) = {
+  private[vs] def cleanPoses(sdfRecord: String, signExist: Boolean) = {
     val it = SBVSPipeline.CDKInit(sdfRecord)
     val strWriter = new StringWriter()
     val writer = new SDFWriter(strWriter)
