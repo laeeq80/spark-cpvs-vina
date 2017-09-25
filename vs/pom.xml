@@ -43,16 +43,6 @@
 			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
 		<dependency>
-			<groupId>OpenEye</groupId>
-			<artifactId>java_api</artifactId>
-			<version>2015Feb3-SNAPSHOT</version>
-		</dependency>
-		<dependency>
-			<groupId>OpenEye</groupId>
-			<artifactId>java_utils</artifactId>
-			<version>2015Feb3-SNAPSHOT</version>
-		</dependency>
-		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
 			<version>4.11</version>
