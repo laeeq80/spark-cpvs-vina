@@ -4,7 +4,6 @@ import org.apache.spark.Logging
 import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
 
-import openeye.oedocking.OEDockMethod
 import scopt.OptionParser
 import se.uu.farmbio.vs.SBVSPipeline
 

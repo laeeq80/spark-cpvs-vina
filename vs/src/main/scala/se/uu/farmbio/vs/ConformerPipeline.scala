@@ -169,6 +169,7 @@ object ConformerPipeline extends Logging {
         mol.setProperty("cdk:Title", title)
 
         //Removing pdbqt junk after getting useful stuff HEHEHE
+        mol.removeProperty("WARNIN")
         mol.removeProperty("REMARK")
         mol.removeProperty("TORSDO")
 
@@ -193,6 +194,7 @@ object ConformerPipeline extends Logging {
         mol.setProperty("cdk:Title", title)
 
         //Removing pdbqt junk after getting useful stuff HEHEHE
+        mol.removeProperty("WARNIN")
         mol.removeProperty("REMARK")
         mol.removeProperty("TORSDO")
 
