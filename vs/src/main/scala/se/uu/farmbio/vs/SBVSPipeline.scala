@@ -27,6 +27,10 @@ private[vs] object SBVSPipeline {
   def splitSDFmolecules(molecules: String) = {
     molecules.trim.split("\\$\\$\\$\\$").map(_.trim + "\n\n$$$$").toList
   }
+  
+   def splitPDBQTmolecules(molecules: String) = {
+    molecules.trim.split("ENDMDL").map(_.trim + "\nENDMDL").toList
+  }
  
   //The function takes sdfRecord and returns a List of IAtomContainer
   def CDKInit(sdfRecord: String) = {

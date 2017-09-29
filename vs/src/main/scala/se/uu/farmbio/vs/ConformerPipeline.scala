@@ -107,13 +107,15 @@ object ConformerPipeline extends Logging {
       }
 
     }
-
-    val dockedRDD = sdfToPdbqtRDD.map { pdbqt =>
+    val singleRecordRDD = sdfToPdbqtRDD.flatMap(SBVSPipeline.splitPDBQTmolecules).mapPartitions(x => Seq(x.mkString("\n")).iterator)
+    
+    val dockedRDD = singleRecordRDD.map { pdbqt =>
       ConformerPipeline.pipeString(pdbqt,
         List(SparkFiles.get(dockingstdFileName), "--receptor",
           SparkFiles.get(receptorFileName), "--config", SparkFiles.get(confFileName)))
     }
-    val pdbqtToSdfRDD = dockedRDD.map { pdbqtWithScores =>
+    val singleRecordRDD2 = dockedRDD.flatMap(SBVSPipeline.splitPDBQTmolecules).mapPartitions(x => Seq(x.mkString("\n")).iterator)
+    val pdbqtToSdfRDD = singleRecordRDD2.map { pdbqtWithScores =>
       ConformerPipeline.pipeString(pdbqtWithScores,
         List(SparkFiles.get(obabelFileName), "-i", "pdbqt", "-o", "sdf"))
     }
