@@ -73,13 +73,13 @@ object Docker extends Logging {
     //Init Spark
     val conf = new SparkConf()
       .setAppName("Docker")
-   
+
     if (params.master != null) {
       conf.setMaster(params.master)
     }
     val sc = new SparkContext(conf)
     sc.hadoopConfiguration.set("se.uu.farmbio.parsers.SDFRecordReader.size", params.size)
-    val t0 = System.currentTimeMillis
+
     var sampleRDD = new SBVSPipeline(sc)
       .readConformerFile(params.conformersFile)
       .getMolecules
@@ -87,22 +87,21 @@ object Docker extends Logging {
     if (params.sampleSize < 1.0) { //Samples Data on the basis of sampleSize Parameter
       sampleRDD = sampleRDD.sample(false, params.sampleSize) //Does not take effect for complete set
     }
-      
+
     var poses = new SBVSPipeline(sc)
       .readConformerRDDs(Seq(sampleRDD))
       .dock(params.receptorFile, params.dockTimePerMol)
-    
+
     val cachedPoses = poses.getMolecules.cache()
+    cachedPoses.saveAsTextFile("data/cached")
     
     val res = poses.getTopPoses(params.topN)
-    val t1 = System.currentTimeMillis
-    val elapsed = t1 - t0
-    logInfo(s"pipeline took: $elapsed millisec.")
+
     if (params.posesCheckpointPath != null) {
       cachedPoses.saveAsTextFile(params.posesCheckpointPath)
     }
     sc.parallelize(res, 1).saveAsTextFile(params.topPosesPath)
-    
+
     sc.stop()
   }
 

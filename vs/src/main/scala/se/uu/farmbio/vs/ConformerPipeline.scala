@@ -115,6 +115,7 @@ object ConformerPipeline extends Logging {
           SparkFiles.get(receptorFileName), "--config", SparkFiles.get(confFileName)))
     }
     val singleRecordRDD2 = dockedRDD.flatMap(SBVSPipeline.splitPDBQTmolecules).mapPartitions(x => Seq(x.mkString("\n")).iterator)
+    
     val pdbqtToSdfRDD = singleRecordRDD2.map { pdbqtWithScores =>
       ConformerPipeline.pipeString(pdbqtWithScores,
         List(SparkFiles.get(obabelFileName), "-i", "pdbqt", "-o", "sdf"))

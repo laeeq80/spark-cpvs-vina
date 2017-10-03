@@ -21,29 +21,49 @@ private[vs] object PosePipeline extends Logging {
   }
 
   private[vs] def parseIdAndScore(pose: String) = {
-    var score: Double = Double.MinValue
+    var score: Double = Double.MaxValue
     val id: String = parseId(pose)
-    var res: String = null
-    val it = SBVSPipeline.CDKInit(pose)
-    if (it.hasNext()) {
-      val mol = it.next
-      res = mol.getProperty("Score")
-    }
-    score = res.toDouble
+    //Sometimes we get empty partitions due to spark parallelism or malformed autodock molecules
+    //We use try catch block for those exceptions
+    try {
 
+      var res: String = null
+      val it = SBVSPipeline.CDKInit(pose)
+      if (it.hasNext()) {
+        val mol = it.next
+        res = mol.getProperty("Score")
+      }
+      score = res.toDouble
+    } catch {
+
+      case exec: Exception => logWarning(" JOB_INFO: Setting the score to Double.MinValue." +
+        "It was not possible to parse the score of the following molecule due to \n" + exec +
+        "\n" + exec.getStackTraceString + "\nPose:\n" + pose)
+
+    }
     (id, score)
 
   }
 
   private[vs] def parseScore(pose: String) = {
-    var result: Double = Double.MinValue
-    var res: String = null
-    val it = SBVSPipeline.CDKInit(pose)
-    if (it.hasNext()) {
-      val mol = it.next
-      res = mol.getProperty("Score")
+    var result: Double = Double.MaxValue
+    //Sometimes we get empty partitions due to spark parallelism or malformed autodock molecules
+    //We use try catch block for those exceptions
+    try {
+      var res: String = null
+      val it = SBVSPipeline.CDKInit(pose)
+      if (it.hasNext()) {
+        val mol = it.next
+        res = mol.getProperty("Score")
+      }
+      result = res.toDouble
+    } catch {
+
+      case exec: Exception => logWarning(" JOB_INFO: Setting the score to Double.MaxValue." +
+        "It was not possible to parse the score of the following molecule due to \n" + exec +
+        "\n" + exec.getStackTraceString + "\nPose:\n" + pose)
+
     }
-    result = res.toDouble
     result
   }
 
@@ -59,7 +79,7 @@ private[vs] class PosePipeline(override val rdd: RDD[String]) extends SBVSPipeli
 
   override def getTopPoses(topN: Int) = {
     val cachedRDD = rdd.cache()
-    
+
     //Parsing id and Score in parallel and collecting data to driver
     val idAndScore = cachedRDD.map {
       case (mol) => PosePipeline.parseIdAndScore(mol)
@@ -67,8 +87,8 @@ private[vs] class PosePipeline(override val rdd: RDD[String]) extends SBVSPipeli
 
     //Finding Distinct top id and score in serial at driver
     val topMols =
-      idAndScore.foldLeft(Map[String, Double]() withDefaultValue Double.MinValue) {
-        case (m, (id, score)) => m updated (id, score max m(id))
+      idAndScore.foldLeft(Map[String, Double]() withDefaultValue Double.MaxValue) {
+        case (m, (id, score)) => m updated (id, score min m(id))
       }
         .toSeq
         .sortBy { case (id, score) => score }
