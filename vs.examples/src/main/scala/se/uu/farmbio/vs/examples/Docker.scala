@@ -93,8 +93,7 @@ object Docker extends Logging {
       .dock(params.receptorFile, params.dockTimePerMol)
 
     val cachedPoses = poses.getMolecules.cache()
-    cachedPoses.saveAsTextFile("data/cached")
-    
+
     val res = poses.getTopPoses(params.topN)
 
     if (params.posesCheckpointPath != null) {

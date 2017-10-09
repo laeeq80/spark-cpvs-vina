@@ -36,7 +36,7 @@ private[vs] object PosePipeline extends Logging {
       score = res.toDouble
     } catch {
 
-      case exec: Exception => logWarning(" JOB_INFO: Setting the score to Double.MinValue." +
+      case exec: Exception => logWarning(" JOB_INFO: Setting the score to Double.MaxValue." +
         "It was not possible to parse the score of the following molecule due to \n" + exec +
         "\n" + exec.getStackTraceString + "\nPose:\n" + pose)
 
