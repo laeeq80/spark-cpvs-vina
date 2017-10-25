@@ -1,8 +1,7 @@
 package se.uu.farmbio.vs.examples
 
 import org.apache.spark.Logging
-import org.apache.spark.SparkConf
-import org.apache.spark.SparkContext
+import org.apache.spark.{SparkConf, SparkContext}
 
 import scopt.OptionParser
 import se.uu.farmbio.vs.SBVSPipeline
