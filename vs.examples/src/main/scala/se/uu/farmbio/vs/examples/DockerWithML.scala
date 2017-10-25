@@ -1,14 +1,11 @@
 package se.uu.farmbio.vs.examples
 
-import org.apache.spark.Logging
-import org.apache.spark.SparkConf
-import org.apache.spark.SparkContext
+import org.apache.spark.{Logging, SparkConf, SparkContext}
 import org.apache.spark.SparkContext._
 import scopt.OptionParser
 import se.uu.farmbio.vs.SBVSPipeline
 import se.uu.farmbio.vs.PosePipeline
-import org.apache.hadoop.io.LongWritable
-import org.apache.hadoop.io.Text
+import org.apache.hadoop.io.{ LongWritable, Text }
 import se.uu.farmbio.parsers.SDFInputFormat
 import se.uu.farmbio.vs.ConformersWithSignsPipeline
 
@@ -32,8 +29,8 @@ object DockerWithML extends Logging {
     calibrationPercent: Double = 0.3,
     numIterations: Int = 50,
     topN: Int = 30,
-    badIn: Int = 1,
-    goodIn: Int = 4,
+    badIn: Int = 9,
+    goodIn: Int = 6,
     singleCycle: Boolean = false,
     stratified: Boolean = false,
     confidence: Double = 0.2,
