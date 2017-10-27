@@ -164,7 +164,13 @@ object DockerWithML extends Logging {
       classOf[Array[Int]],
       classOf[Array[Double]],
       classOf[Array[String]],
-      classOf[scala.collection.mutable.WrappedArray$ofRef]))
+      classOf[scala.collection.mutable.WrappedArray$ofRef],      
+      classOf[Array[se.uu.farmbio.cp.ICPClassifierModel[se.uu.farmbio.cp.UnderlyingAlgorithm]]],
+      classOf[se.uu.farmbio.cp.ICPClassifierModelImpl[se.uu.farmbio.cp.UnderlyingAlgorithm]],
+      classOf[se.uu.farmbio.cp.alg.SVM],
+      classOf[org.apache.spark.mllib.classification.SVMModel],
+      classOf[se.uu.farmbio.cp.alg.SVM$$anonfun$$init$$1]
+      ))
 
     val sc2 = new SparkContext(conf2)
     sc2.hadoopConfiguration.set("se.uu.farmbio.parsers.SDFRecordReader.size", params.size)

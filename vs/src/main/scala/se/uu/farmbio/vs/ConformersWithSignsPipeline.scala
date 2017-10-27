@@ -10,6 +10,7 @@ import org.openscience.cdk.io.SDFWriter
 import java.io.StringWriter
 import org.apache.spark.storage.StorageLevel
 import java.io.PrintWriter
+import se.uu.farmbio.cp.ICPClassifierModel
 
 trait ConformersWithSignsTransforms {
   def dockWithML(
@@ -193,7 +194,11 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       val svm = new SVM(properTraining.persist(StorageLevel.MEMORY_AND_DISK_SER), numIterations)
       //SVM based ICP Classifier (our model)
       val icp = ICP.trainClassifier(svm, numClasses = 2, calibration)
-
+      /*
+      //Saving Models
+      sc.parallelize(Seq(icp), 1).saveAsObjectFile("data/model" + counter)
+      val loadedIcpModel = sc.objectFile[ICPClassifierModel[SVM]]("data/model1").first()
+      */
       parseScoreRDD.unpersist()
       lpDsTrain.unpersist()
       properTraining.unpersist()
