@@ -155,7 +155,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
 
       val dsInitToDock = dsInit.mapPartitions(x => Seq(x.mkString("\n")).iterator)
 
-      //Step 3
+      //Step 2
       //Mocking the sampled dataset. We already have scores, docking not required
       val dsDock = dsInit
       logInfo("\nJOB_INFO: cycle " + counter
@@ -163,11 +163,11 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
 
       logInfo("JOB_INFO: dsInit in cycle " + counter + " is " + dsInit.count)
 
-      //Step 4
+      //Step 3
       //Subtract the sampled molecules from main dataset
       ds = ds.subtract(dsInit)
 
-      //Step 5
+      //Step 4
       //Keeping processed poses
       if (poses == null) {
         poses = dsDock
@@ -175,7 +175,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         poses = poses.union(dsDock)
       }
 
-      //Step 6 and 7 Computing dsTopAndBottom
+      //Step 5 and 6 Computing dsTopAndBottom
       val parseScoreRDD = dsDock.map(PosePipeline.parseScore).persist(StorageLevel.MEMORY_ONLY)
       val parseScoreHistogram = parseScoreRDD.histogram(10)
 
@@ -185,7 +185,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
           ConformersWithSignsPipeline.labelTopAndBottom(mol, score, parseScoreHistogram._1, badIn, goodIn)
       }.map(_.trim).filter(_.nonEmpty)
 
-      //Step 8 Union dsTrain and dsTopAndBottom
+      //Step 7 Union dsTrain and dsTopAndBottom
       if (dsTrain == null) {
         dsTrain = dsTopAndBottom
       } else {
@@ -222,7 +222,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         sdfmol => ConformersWithSignsPipeline.getLPRDD(sdfmol)
       }
 
-      //Step 9 Training
+      //Step 8 Training
       //Train icps
       calibrationSizeDynamic = (dsTrain.count * calibrationPercent).toInt
       val (calibration, properTraining) = ICP.calibrationSplit(
@@ -239,7 +239,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
 
       logInfo("JOB_INFO: Training Completed in cycle " + counter)
 
-      //Step 8 Prediction using our model on complete dataset
+      //Step 9 Prediction using our model on complete dataset
       val predictions = fvDsComplete.map {
         case (sdfmol, predictionData) => (sdfmol, icp.predict(predictionData, confidence))
       }
