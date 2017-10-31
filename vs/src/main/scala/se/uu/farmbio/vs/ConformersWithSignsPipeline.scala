@@ -88,6 +88,19 @@ object ConformersWithSignsPipeline extends Serializable {
     strWriter.toString() //return the molecule  
   }
 
+  private def getLabel(sdfRecord: String) = {
+
+    val it = SBVSPipeline.CDKInit(sdfRecord)
+    var label: String = null
+    while (it.hasNext()) {
+      val mol = it.next
+      label = mol.getProperty("Label")
+
+    }
+    label
+
+  }
+
 }
 
 private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
@@ -109,12 +122,16 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
     var poses: RDD[String] = null
     var dsTrain: RDD[String] = null
     var dsOnePredicted: RDD[(String)] = null
+    var dsZeroRemoved: RDD[(String)] = null
+    var cumulativeZeroRemoved: RDD[(String)] = null
     var ds: RDD[String] = rdd.flatMap(SBVSPipeline.splitSDFmolecules).persist(StorageLevel.MEMORY_AND_DISK_SER)
     var eff: Double = 0.0
     var counter: Int = 1
     var effCounter: Int = 0
     var calibrationSizeDynamic: Int = 0
     var dsInit: RDD[String] = null
+    var dsBadInTrainingSet: RDD[String] = null
+    var dsGoodInTrainingSet: RDD[String] = null
 
     //Converting complete dataset (dsComplete) to feature vector required for conformal prediction
     //We also need to keep intact the poses so at the end we know
@@ -139,15 +156,12 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       val dsInitToDock = dsInit.mapPartitions(x => Seq(x.mkString("\n")).iterator)
 
       //Step 3
-      //Docking the sampled dataset
-      val dsDock = ConformerPipeline
-        .getDockingRDD(receptorPath, dockTimePerMol = false, sc, dsInitToDock, true)
-        .map {
-          case (dirtyMol) => ConformerPipeline.cleanPoses(dirtyMol, true)
-        }
-        .flatMap(SBVSPipeline.splitSDFmolecules).persist(StorageLevel.DISK_ONLY)
+      //Mocking the sampled dataset. We already have scores, docking not required
+      val dsDock = dsInit
+      logInfo("\nJOB_INFO: cycle " + counter
+        + "   ################################################################\n")
 
-      logInfo("JOB_INFO: Docking Completed in cycle " + counter)
+      logInfo("JOB_INFO: dsInit in cycle " + counter + " is " + dsInit.count)
 
       //Step 4
       //Subtract the sampled molecules from main dataset
@@ -178,6 +192,31 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         dsTrain = dsTrain.union(dsTopAndBottom).persist(StorageLevel.DISK_ONLY)
       }
 
+      logInfo("JOB_INFO: Training set size in cycle " + counter + " is " + dsTrain.count)
+
+      //Counting zeroes and ones in each training set in each cycle
+      if (dsTrain == null) {
+        dsBadInTrainingSet = dsTopAndBottom.filter {
+          case (mol) => ConformersWithSignsPipeline.getLabel(mol) == "0.0"
+        }
+      } else {
+        dsBadInTrainingSet = dsTrain.filter {
+          case (mol) => ConformersWithSignsPipeline.getLabel(mol) == "0.0"
+        }
+      }
+
+      if (dsTrain == null) {
+        dsGoodInTrainingSet = dsTopAndBottom.filter {
+          case (mol) => ConformersWithSignsPipeline.getLabel(mol) == "1.0"
+        }
+      } else {
+        dsGoodInTrainingSet = dsTrain.filter {
+          case (mol) => ConformersWithSignsPipeline.getLabel(mol) == "1.0"
+        }
+      }
+      logInfo("JOB_INFO: Zero Labeled Mols in Training set in cycle " + counter + " are " + dsBadInTrainingSet.count)
+      logInfo("JOB_INFO: One Labeled Mols in Training set in cycle " + counter + " are " + dsGoodInTrainingSet.count)
+
       //Converting SDF training set to LabeledPoint(label+sign) required for conformal prediction
       val lpDsTrain = dsTrain.flatMap {
         sdfmol => ConformersWithSignsPipeline.getLPRDD(sdfmol)
@@ -207,10 +246,38 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
 
       val dsZeroPredicted: RDD[(String)] = predictions
         .filter { case (sdfmol, prediction) => (prediction == Set(0.0)) }
+        .map { case (sdfmol, prediction) => sdfmol }.cache
+      dsOnePredicted = predictions
+        .filter { case (sdfmol, prediction) => (prediction == Set(1.0)) }
+        .map { case (sdfmol, prediction) => sdfmol }.cache
+      val dsBothUnknown: RDD[(String)] = predictions
+        .filter { case (sdfmol, prediction) => (prediction == Set(0.0, 1.0)) }
         .map { case (sdfmol, prediction) => sdfmol }
 
-      //Step 10 Subtracting {0} mols from main dataset
-      ds = ds.subtract(dsZeroPredicted).persist(StorageLevel.MEMORY_AND_DISK_SER)
+      //Step 10 Subtracting {0} moles from dataset which has not been previously subtracted
+      if (dsZeroRemoved == null)
+        dsZeroRemoved = dsZeroPredicted.subtract(poses)
+      else
+        dsZeroRemoved = dsZeroPredicted.subtract(cumulativeZeroRemoved.union(poses))
+
+      ds = ds.subtract(dsZeroRemoved)
+
+      logInfo("JOB_INFO: Number of bad mols predicted in cycle " +
+        counter + " are " + dsZeroPredicted.count)
+      logInfo("JOB_INFO: Number of bad mols removed in cycle " +
+        counter + " are " + dsZeroRemoved.count)
+      logInfo("JOB_INFO: Number of good mols predicted in cycle " +
+        counter + " are " + dsOnePredicted.count)
+      logInfo("JOB_INFO: Number of Both Unknown mols predicted in cycle " +
+        counter + " are " + dsBothUnknown.count)
+
+      //Keeping all previous removed bad mols
+      if (cumulativeZeroRemoved == null)
+        cumulativeZeroRemoved = dsZeroRemoved
+      else
+        cumulativeZeroRemoved = cumulativeZeroRemoved.union(dsZeroRemoved)
+
+      dsZeroPredicted.unpersist()
 
       //Computing efficiency for stopping loop
       val totalCount = sc.accumulator(0.0)
@@ -233,28 +300,22 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         effCounter = 0
       }
       counter = counter + 1
-      if (effCounter >= 2) {
-        dsOnePredicted = predictions
-          .filter { case (sdfmol, prediction) => (prediction == Set(1.0)) }
-          .map { case (sdfmol, prediction) => sdfmol }
-      }
+     
     } while (effCounter < 2 && !singleCycle)
 
-    dsOnePredicted = dsOnePredicted.subtract(poses)
+    logInfo("JOB_INFO: Total number of bad mols removed are " + cumulativeZeroRemoved.count)
 
-    val dsOnePredictedToDock = dsOnePredicted.mapPartitions(x => Seq(x.mkString("\n")).iterator)
-
-    val dsDockOne = ConformerPipeline.getDockingRDD(receptorPath, false, sc, dsOnePredictedToDock, true)
-      .map {
-        case (dirtyMol) => ConformerPipeline.cleanPoses(dirtyMol, true)
-      }
-      .flatMap(SBVSPipeline.splitSDFmolecules)
+    //Docking rest of the dsOne mols
+    val dsDockOne = dsOnePredicted.subtract(poses).cache()
+    logInfo("JOB_INFO: Number of mols in dsDockOne are " + dsDockOne.count)
 
     //Keeping rest of processed poses i.e. dsOne mol poses
     if (poses == null)
       poses = dsDockOne
     else
       poses = poses.union(dsDockOne)
+
+    logInfo("JOB_INFO: Total number of docked mols are " + poses.count)
     new PosePipeline(poses)
   }
 

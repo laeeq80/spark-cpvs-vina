@@ -56,11 +56,7 @@ object SignatureExample extends Logging {
       .getMolecules
       .flatMap(SBVSPipeline.splitSDFmolecules)
       .coalesce(8, false)
-      .collect()
-      //.saveAsTextFile(params.signatureOutputFile)
-    val pw = new PrintWriter(params.signatureOutputFile)
-    signatures.foreach(pw.println(_))
-    pw.close
+      .saveAsTextFile(params.signatureOutputFile)
     sc.stop()
 
   }
