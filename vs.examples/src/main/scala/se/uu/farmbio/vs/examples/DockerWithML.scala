@@ -3,11 +3,9 @@ package se.uu.farmbio.vs.examples
 import org.apache.spark.{Logging, SparkConf, SparkContext}
 import org.apache.spark.SparkContext._
 import scopt.OptionParser
-import se.uu.farmbio.vs.SBVSPipeline
-import se.uu.farmbio.vs.PosePipeline
+import se.uu.farmbio.vs.{SBVSPipeline, PosePipeline, ConformersWithSignsPipeline}
 import org.apache.hadoop.io.{ LongWritable, Text }
 import se.uu.farmbio.parsers.SDFInputFormat
-import se.uu.farmbio.vs.ConformersWithSignsPipeline
 
 /**
  * @author laeeq
@@ -20,7 +18,7 @@ object DockerWithML extends Logging {
     posesFileWithSigns: String = null,
     topPosesPath: String = null,
     receptorFile: String = null,
-    oeLicensePath: String = null,
+    modelPath: String = null,
     firstFile: String = null,
     secondFile: String = null,
     dsInitSize: Int = 100,
@@ -54,6 +52,12 @@ object DockerWithML extends Logging {
         .required()
         .text("path to top output poses")
         .action((x, c) => c.copy(topPosesPath = x))
+      
+      arg[String]("<model-path>")
+        .required()
+        .text("path to save model")
+        .action((x, c) => c.copy(modelPath = x))  
+        
       arg[String]("<first-file>")
         .required()
         .text("path to input file with top N mols")
@@ -126,7 +130,13 @@ object DockerWithML extends Logging {
       classOf[Array[Int]],
       classOf[Array[Double]],
       classOf[Array[String]],
-      classOf[scala.collection.mutable.WrappedArray$ofRef]))
+      classOf[scala.collection.mutable.WrappedArray$ofRef],
+      classOf[Array[se.uu.farmbio.cp.ICPClassifierModel[se.uu.farmbio.cp.UnderlyingAlgorithm]]],
+      classOf[se.uu.farmbio.cp.ICPClassifierModelImpl[se.uu.farmbio.cp.UnderlyingAlgorithm]],
+      classOf[se.uu.farmbio.cp.alg.SVM],
+      classOf[org.apache.spark.mllib.classification.SVMModel],
+      classOf[se.uu.farmbio.cp.alg.SVM$$anonfun$$init$$1]  
+    ))
 
     val sc2 = new SparkContext(conf2)
     sc2.hadoopConfiguration.set("se.uu.farmbio.parsers.SDFRecordReader.size", params.size)
@@ -142,7 +152,8 @@ object DockerWithML extends Logging {
         params.goodIn,
         params.singleCycle,
         params.stratified,
-        params.confidence)
+        params.confidence,
+        params.modelPath)
       .getTopPoses(params.topN)
 
     sc2.parallelize(conformerWithSigns, 1).saveAsTextFile(params.topPosesPath)

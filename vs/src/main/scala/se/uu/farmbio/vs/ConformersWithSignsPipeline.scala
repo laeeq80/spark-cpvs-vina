@@ -7,9 +7,9 @@ import org.apache.spark.Logging
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.linalg.{ Vector, Vectors }
 import org.openscience.cdk.io.SDFWriter
-import java.io.StringWriter
+import java.io.{StringWriter, PrintWriter}
 import org.apache.spark.storage.StorageLevel
-import java.io.PrintWriter
+import se.uu.farmbio.cp.ICPClassifierModel
 
 trait ConformersWithSignsTransforms {
   def dockWithML(
@@ -22,7 +22,8 @@ trait ConformersWithSignsTransforms {
     goodIn: Int,
     singleCycle: Boolean,
     stratified: Boolean,
-    confidence: Double): SBVSPipeline with PoseTransforms
+    confidence: Double,
+    modelPath: String): SBVSPipeline with PoseTransforms
 
 }
 
@@ -116,7 +117,8 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
     goodIn: Int,
     singleCycle: Boolean,
     stratified: Boolean,
-    confidence: Double) = {
+    confidence: Double,
+    modelPath: String) = {
 
     //initializations
     var poses: RDD[String] = null
@@ -232,7 +234,14 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       val svm = new SVM(properTraining.persist(StorageLevel.MEMORY_AND_DISK_SER), numIterations)
       //SVM based ICP Classifier (our model)
       val icp = ICP.trainClassifier(svm, numClasses = 2, calibration)
-
+      
+      //Saving Models
+      sc.parallelize(Seq(icp), 1).saveAsObjectFile(modelPath + counter)
+      logInfo("JOB_INFO: Model saved in cycle " + counter + " at " + modelPath + counter)
+      
+      //Loading Model for testing purposes
+      val loadedIcpModel = sc.objectFile[ICPClassifierModel[SVM]](modelPath + counter).first()
+      
       parseScoreRDD.unpersist()
       lpDsTrain.unpersist()
       properTraining.unpersist()
@@ -241,7 +250,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
 
       //Step 9 Prediction using our model on complete dataset
       val predictions = fvDsComplete.map {
-        case (sdfmol, predictionData) => (sdfmol, icp.predict(predictionData, confidence))
+        case (sdfmol, predictionData) => (sdfmol, loadedIcpModel.predict(predictionData, confidence))
       }
 
       val dsZeroPredicted: RDD[(String)] = predictions
