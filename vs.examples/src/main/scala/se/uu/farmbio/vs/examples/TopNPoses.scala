@@ -22,9 +22,6 @@ object TopNPoses extends Logging {
       opt[String]("master")
         .text("spark master")
         .action((x, c) => c.copy(master = x))
-      opt[String]("oeLicensePath")
-        .text("path to OEChem License")
-        .action((x, c) => c.copy(oeLicensePath = x))
       opt[Int]("n")
         .text("number of top scoring poses to extract (default: 30).")
         .action((x, c) => c.copy(topN = x))
@@ -50,9 +47,7 @@ object TopNPoses extends Logging {
     //Init Spark
     val conf = new SparkConf()
       .setAppName("TopNPoses")
-    if (params.oeLicensePath != null) {
-      conf.setExecutorEnv("OE_LICENSE", params.oeLicensePath)
-    }
+    
     if (params.master != null) {
       conf.setMaster(params.master)
     }

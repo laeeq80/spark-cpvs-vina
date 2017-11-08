@@ -60,8 +60,8 @@ object Compare extends Logging {
       .getMolecules
       .flatMap {  mol => SBVSPipeline.splitSDFmolecules(mol.toString) }
       
-    val scores1 = mols1.map { mol => PosePipeline.parseScore(mol) }
-    
+    val scores1 = mols1.map { mol => PosePipeline.parseId(mol) }
+    println(s"Number of mols in file 1 are " + scores1.count())
     val Array1 = scores1.collect()
     
     val mols2 = new SBVSPipeline(sc)
@@ -69,8 +69,8 @@ object Compare extends Logging {
       .getMolecules
       .flatMap {  mol => SBVSPipeline.splitSDFmolecules(mol.toString) }
    
-    val scores2 = mols2.map { mol => PosePipeline.parseScore(mol) }
-    
+    val scores2 = mols2.map { mol => PosePipeline.parseId(mol) }
+    println(s"Number of mols in file 2 are " + scores2.count())
     val Array2 = scores2.collect()
     
     var counter : Double = 0.0
