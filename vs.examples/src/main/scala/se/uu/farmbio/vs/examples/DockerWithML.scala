@@ -194,20 +194,20 @@ object DockerWithML extends Logging {
     val mols1 = sc2.hadoopFile[LongWritable, Text, SDFInputFormat](params.firstFile, 2)
       .flatMap(mol => SBVSPipeline.splitSDFmolecules(mol._2.toString))
      
-    val Array1 = mols1.map { mol => PosePipeline.parseScore(mol) }.collect()
+    val Array1 = mols1.map { mol => PosePipeline.parseId(mol) }.collect()
 
     val mols2 = sc2.hadoopFile[LongWritable, Text, SDFInputFormat](params.secondFile, 2)
       .flatMap(mol => SBVSPipeline.splitSDFmolecules(mol._2.toString))
 
-    val Array2 = mols2.map { mol => PosePipeline.parseScore(mol) }.collect()
+      val Array2 = mols2.map { mol => PosePipeline.parseId(mol) }.collect()
 
     var counter: Double = 0.0
     for (i <- 0 to Array1.length - 1)
       for (j <- 0 to Array2.length - 1)
         if (Array1(i) == Array2(j))
           counter = counter + 1
-    logInfo("JOB_INFO: Bad bins ranges from 0-" + params.badIn +
-      " and good bins ranges from " + params.goodIn + "-10")
+    logInfo("JOB_INFO: Good bins ranges from 0-" + params.goodIn +
+      " and bad bins ranges from " + params.badIn + "-10")
     logInfo("JOB_INFO: Number of molecules matched are " + counter)
     logInfo("JOB_INFO: Percentage of same results is " + (counter / params.topN) * 100)
     sc2.stop()
