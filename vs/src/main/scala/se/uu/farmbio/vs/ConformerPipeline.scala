@@ -22,7 +22,7 @@ import org.openscience.cdk.interfaces.IAtomContainer
 trait ConformerTransforms {
   def dock(receptorPath: String, dockTimePerMol: Boolean = false): SBVSPipeline with PoseTransforms
   def repartition: SBVSPipeline with ConformerTransforms
-  def generateSignatures(): SBVSPipeline with ConformersWithSignsTransforms
+  def generateSignatures(sig2IdPath: String): SBVSPipeline with ConformersWithSignsTransforms
 }
 
 object ConformerPipeline extends Logging {
@@ -226,7 +226,7 @@ private[vs] class ConformerPipeline(override val rdd: RDD[String])
     new PosePipeline(res)
   }
 
-  override def generateSignatures = {
+  override def generateSignatures (sig2IdPath: String) = {
     //Split molecules, so there is only one molecule per RDD record
     val splitRDD = rdd.flatMap(SBVSPipeline.splitSDFmolecules)
     //Convert to IAtomContainer, fake labels are added
@@ -240,7 +240,13 @@ private[vs] class ConformerPipeline(override val rdd: RDD[String])
           }
     }
     //Convert to labeled point 
-    val (lps, _) = SGUtils.atoms2LP_UpdateSignMapCarryData(molsWithFakeLabels, null, 1, 3)
+    val (lps, sig2IdMap) = SGUtils.atoms2LP_UpdateSignMapCarryData(molsWithFakeLabels, null, 1, 3)
+
+    val sig2IdMapLocal = sig2IdMap.collect
+
+    //save sig2IdMap
+    SGUtils_Serial.saveSig2IdMap(sig2IdPath, sig2IdMapLocal)
+    
     //Throw away the labels and only keep the features 
     val molAndSparseVector = lps.map {
       case (mol, lp) => (mol, lp.features.toSparse.toString())
