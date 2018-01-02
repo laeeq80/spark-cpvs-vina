@@ -14,9 +14,9 @@ trait PoseTransforms {
   def getTopPoses(topN: Int): Array[String]
 }
 
-private[vs] object PosePipeline extends Logging {
+object PosePipeline extends Logging {
 
-  private def parseId(pose: String) = {
+  private[vs] def parseId(pose: String) = {
     Source.fromString(pose).getLines.next
   }
 
@@ -45,7 +45,7 @@ private[vs] object PosePipeline extends Logging {
 
   }
 
-  private[vs] def parseScore(pose: String) = {
+  def parseScore(pose: String) = {
     var result: Double = Double.MaxValue
     //Sometimes we get empty partitions due to spark parallelism or malformed autodock molecules
     //We use try catch block for those exceptions

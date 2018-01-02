@@ -18,11 +18,13 @@ import org.apache.spark.Logging
 
 import org.openscience.cdk.io.SDFWriter
 import org.openscience.cdk.interfaces.IAtomContainer
+import scala.tools.nsc.doc.model.Public
+
 
 trait ConformerTransforms {
   def dock(receptorPath: String, dockTimePerMol: Boolean = false): SBVSPipeline with PoseTransforms
   def repartition: SBVSPipeline with ConformerTransforms
-  def generateSignatures(): SBVSPipeline with ConformersWithSignsTransforms
+  def generateSignatures(sig2IdPath: String): SBVSPipeline with ConformersWithSignsTransforms
 }
 
 object ConformerPipeline extends Logging {
@@ -31,7 +33,7 @@ object ConformerPipeline extends Logging {
   val VINA_HOME = "http://pele.farmbio.uu.se/cpvs-vina/"
   val OBABEL_HOME_URL = "http://pele.farmbio.uu.se/cpvs-vina/"
   //The Spark built-in pipe splits molecules line by line, we need a custom one
-  private[vs] def pipeString(str: String, command: List[String]) = {
+  def pipeString(str: String, command: List[String]) = {
 
     //Start executable
     val pb = new ProcessBuilder(command.asJava)
@@ -150,7 +152,7 @@ object ConformerPipeline extends Logging {
     strWriter.toString() //return the molecule  
   }
 
-  private[vs] def cleanPoses(sdfRecord: String, signExist: Boolean) = {
+  def cleanPoses(sdfRecord: String, signExist: Boolean) = {
     val it = SBVSPipeline.CDKInit(sdfRecord)
     val strWriter = new StringWriter()
     val writer = new SDFWriter(strWriter)
@@ -226,7 +228,7 @@ private[vs] class ConformerPipeline(override val rdd: RDD[String])
     new PosePipeline(res)
   }
 
-  override def generateSignatures = {
+  override def generateSignatures (sig2IdPath: String) = {
     //Split molecules, so there is only one molecule per RDD record
     val splitRDD = rdd.flatMap(SBVSPipeline.splitSDFmolecules)
     //Convert to IAtomContainer, fake labels are added
@@ -240,7 +242,13 @@ private[vs] class ConformerPipeline(override val rdd: RDD[String])
           }
     }
     //Convert to labeled point 
-    val (lps, _) = SGUtils.atoms2LP_UpdateSignMapCarryData(molsWithFakeLabels, null, 1, 3)
+    val (lps, sig2IdMap) = SGUtils.atoms2LP_UpdateSignMapCarryData(molsWithFakeLabels, null, 1, 3)
+
+    val sig2IdMapLocal = sig2IdMap.collect
+
+    //save sig2IdMap
+    SGUtils_Serial.saveSig2IdMap(sig2IdPath, sig2IdMapLocal)
+    
     //Throw away the labels and only keep the features 
     val molAndSparseVector = lps.map {
       case (mol, lp) => (mol, lp.features.toSparse.toString())
