@@ -18,6 +18,8 @@ import org.apache.spark.Logging
 
 import org.openscience.cdk.io.SDFWriter
 import org.openscience.cdk.interfaces.IAtomContainer
+import scala.tools.nsc.doc.model.Public
+
 
 trait ConformerTransforms {
   def dock(receptorPath: String, dockTimePerMol: Boolean = false): SBVSPipeline with PoseTransforms
@@ -31,7 +33,7 @@ object ConformerPipeline extends Logging {
   val VINA_HOME = "http://pele.farmbio.uu.se/cpvs-vina/"
   val OBABEL_HOME_URL = "http://pele.farmbio.uu.se/cpvs-vina/"
   //The Spark built-in pipe splits molecules line by line, we need a custom one
-  private[vs] def pipeString(str: String, command: List[String]) = {
+  def pipeString(str: String, command: List[String]) = {
 
     //Start executable
     val pb = new ProcessBuilder(command.asJava)
@@ -150,7 +152,7 @@ object ConformerPipeline extends Logging {
     strWriter.toString() //return the molecule  
   }
 
-  private[vs] def cleanPoses(sdfRecord: String, signExist: Boolean) = {
+  def cleanPoses(sdfRecord: String, signExist: Boolean) = {
     val it = SBVSPipeline.CDKInit(sdfRecord)
     val strWriter = new StringWriter()
     val writer = new SDFWriter(strWriter)
