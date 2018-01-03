@@ -12,8 +12,10 @@ import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.rdd.RDD
 import se.uu.it.cp.UnderlyingAlgorithm
 
+trait MLlibSVMTrait
+
 // Define a MLlib SVM underlying algorithm
-private object SVM {
+object SVM {
   def trainingProcedure(
     input: RDD[LabeledPoint],
     maxNumItearations: Int,
@@ -47,8 +49,8 @@ private object SVM {
   }
 }
 
-private[vs] class MLlibSVM(val properTrainingSet: RDD[LabeledPoint], numIterations: Int)
-    extends UnderlyingAlgorithm[LabeledPoint] {
+class MLlibSVM(val properTrainingSet: RDD[LabeledPoint], numIterations: Int)
+    extends UnderlyingAlgorithm[LabeledPoint]  {
 
   // First describe how to access Spark's LabeledPoint structure 
   override def makeDataPoint(features: Seq[Double], label: Double) =

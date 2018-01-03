@@ -25,7 +25,7 @@ import util.control.Breaks._
 
 trait SGUtils_SerialTrait
 
-private[vs] object SGUtils_Serial {
+object SGUtils_Serial {
 
   //Saving Sig2IdMap
   def saveSig2IdMap(sig2IdPath: String, sig2IdMap: Array[Sig2ID_Mapping]) = {

@@ -20,10 +20,10 @@ import se.uu.it.cp.InductiveClassifier
 object StandalonePrediction {
 
   case class Arglist(
-    master: String = null,
+    master:         String = null,
     conformersFile: String = null,
-    sig2IdPath: String = null,
-    filePath: String = null)
+    sig2IdPath:     String = null,
+    filePath:       String = null)
 
   def main(args: Array[String]) {
     val defaultParams = Arglist()
