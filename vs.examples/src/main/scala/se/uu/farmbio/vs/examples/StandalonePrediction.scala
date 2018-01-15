@@ -84,7 +84,7 @@ object StandalonePrediction {
 
     //Predict New molecule(s)
     val predictions = newSigns.map { case (sdfMols, features) => (features, svmModel.predict(features.toArray, 0.5)) }
-
+    
     //Update Predictions to the Prediction Table
     val pw = new PrintWriter(params.filePath)
     predictions.foreach(pw.println(_))

@@ -20,7 +20,6 @@ import org.openscience.cdk.io.SDFWriter
 import org.openscience.cdk.interfaces.IAtomContainer
 import scala.tools.nsc.doc.model.Public
 
-
 trait ConformerTransforms {
   def dock(receptorPath: String, dockTimePerMol: Boolean = false): SBVSPipeline with PoseTransforms
   def repartition: SBVSPipeline with ConformerTransforms
@@ -46,7 +45,7 @@ object ConformerPipeline extends Logging {
         }
       }
     }.start
-    // Start a thread to feed the process input 
+    // Start a thread to feed the process input
     new Thread("stdin writer") {
       override def run() {
         val out = new PrintWriter(proc.getOutputStream)
@@ -98,34 +97,38 @@ object ConformerPipeline extends Logging {
     var sdfToPdbqtRDD: RDD[String] = null
     if (signExist) {
       sdfToPdbqtRDD = rdd.map { sdf =>
-        ConformerPipeline.pipeString(sdf,
+        ConformerPipeline.pipeString(
+          sdf,
           List(SparkFiles.get(obabelFileName), "-i", "sdf", "-o", "pdbqt", "--append", "Signature")).trim()
       }
 
     } else {
       sdfToPdbqtRDD = rdd.map { sdf =>
-        ConformerPipeline.pipeString(sdf,
+        ConformerPipeline.pipeString(
+          sdf,
           List(SparkFiles.get(obabelFileName), "-i", "sdf", "-o", "pdbqt")).trim()
       }
 
     }
     val singleRecordRDD = sdfToPdbqtRDD.flatMap(SBVSPipeline.splitPDBQTmolecules).mapPartitions(x => Seq(x.mkString("\n")).iterator)
-    
+
     val dockedRDD = singleRecordRDD.map { pdbqt =>
-      ConformerPipeline.pipeString(pdbqt,
+      ConformerPipeline.pipeString(
+        pdbqt,
         List(SparkFiles.get(dockingstdFileName), "--receptor",
           SparkFiles.get(receptorFileName), "--config", SparkFiles.get(confFileName)))
     }
     val singleRecordRDD2 = dockedRDD.flatMap(SBVSPipeline.splitPDBQTmolecules).mapPartitions(x => Seq(x.mkString("\n")).iterator)
-    
+
     val pdbqtToSdfRDD = singleRecordRDD2.map { pdbqtWithScores =>
-      ConformerPipeline.pipeString(pdbqtWithScores,
+      ConformerPipeline.pipeString(
+        pdbqtWithScores,
         List(SparkFiles.get(obabelFileName), "-i", "pdbqt", "-o", "sdf"))
     }
     pdbqtToSdfRDD
   }
 
-  private def sdfStringToIAtomContainer(sdfRecord: String) = {
+  def sdfStringToIAtomContainer(sdfRecord: String) = {
 
     val it = SBVSPipeline.CDKInit(sdfRecord)
     var res = Seq[(IAtomContainer)]()
@@ -149,9 +152,9 @@ object ConformerPipeline extends Logging {
       writer.write(mol)
     }
     writer.close
-    strWriter.toString() //return the molecule  
+    strWriter.toString() //return the molecule
   }
-
+  
   def cleanPoses(sdfRecord: String, signExist: Boolean) = {
     val it = SBVSPipeline.CDKInit(sdfRecord)
     val strWriter = new StringWriter()
@@ -178,7 +181,7 @@ object ConformerPipeline extends Logging {
         mol.removeProperty("REMARK")
         mol.removeProperty("TORSDO")
 
-        //Removing cdk junk 
+        //Removing cdk junk
         mol.removeProperty("cdk:Remark")
 
         //Writing clean mol
@@ -203,7 +206,7 @@ object ConformerPipeline extends Logging {
         mol.removeProperty("REMARK")
         mol.removeProperty("TORSDO")
 
-        //Removing cdk junk 
+        //Removing cdk junk
         mol.removeProperty("cdk:Remark")
 
         //Writing clean mol
@@ -211,13 +214,13 @@ object ConformerPipeline extends Logging {
       }
     }
     writer.close
-    strWriter.toString() //return the molecule  
+    strWriter.toString() //return the molecule
   }
 
 }
 
 private[vs] class ConformerPipeline(override val rdd: RDD[String])
-    extends SBVSPipeline(rdd) with ConformerTransforms {
+  extends SBVSPipeline(rdd) with ConformerTransforms {
 
   override def dock(receptorPath: String, dockTimePerMol: Boolean) = {
     val pipedRDD = ConformerPipeline.getDockingRDD(receptorPath, dockTimePerMol, sc, rdd, false)
@@ -228,7 +231,7 @@ private[vs] class ConformerPipeline(override val rdd: RDD[String])
     new PosePipeline(res)
   }
 
-  override def generateSignatures (sig2IdPath: String) = {
+  override def generateSignatures(sig2IdPath: String) = {
     //Split molecules, so there is only one molecule per RDD record
     val splitRDD = rdd.flatMap(SBVSPipeline.splitSDFmolecules)
     //Convert to IAtomContainer, fake labels are added
@@ -241,15 +244,15 @@ private[vs] class ConformerPipeline(override val rdd: RDD[String])
               (sdfmol, 0.0, mol) // sdfmol is a carry, 0.0 is fake label and mol is the IAtomContainer
           }
     }
-    //Convert to labeled point 
+    //Convert to labeled point
     val (lps, sig2IdMap) = SGUtils.atoms2LP_UpdateSignMapCarryData(molsWithFakeLabels, null, 1, 3)
 
     val sig2IdMapLocal = sig2IdMap.collect
 
     //save sig2IdMap
     SGUtils_Serial.saveSig2IdMap(sig2IdPath, sig2IdMapLocal)
-    
-    //Throw away the labels and only keep the features 
+
+    //Throw away the labels and only keep the features
     val molAndSparseVector = lps.map {
       case (mol, lp) => (mol, lp.features.toSparse.toString())
     }

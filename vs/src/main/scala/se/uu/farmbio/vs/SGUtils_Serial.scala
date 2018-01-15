@@ -2,7 +2,6 @@ package se.uu.farmbio.vs
 
 import java.io.{ File, PrintWriter }
 import java.lang.Long
-
 import scala.io.Source
 import scala.reflect.ClassTag
 import scala.collection.immutable.ListMap

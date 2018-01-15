@@ -23,19 +23,18 @@ import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectOutputStream
 
 trait ConformersWithSignsTransforms {
   def dockWithML(
-    receptorPath: String,
-    pdbCode: String,
-    jdbcHostname : String,
-    dsInitSize: Int,
-    dsIncreSize: Int,
+    receptorPath:       String,
+    pdbCode:            String,
+    jdbcHostname:       String,
+    dsInitSize:         Int,
+    dsIncreSize:        Int,
     calibrationPercent: Double,
-    numIterations: Int,
-    badIn: Int,
-    goodIn: Int,
-    singleCycle: Boolean,
-    stratified: Boolean,
-    confidence: Double): SBVSPipeline with PoseTransforms
-
+    numIterations:      Int,
+    badIn:              Int,
+    goodIn:             Int,
+    singleCycle:        Boolean,
+    stratified:         Boolean,
+    confidence:         Double): SBVSPipeline with PoseTransforms
 }
 
 object ConformersWithSignsPipeline extends Serializable {
@@ -74,11 +73,11 @@ object ConformersWithSignsPipeline extends Serializable {
   }
 
   private def labelTopAndBottom(
-    pdbqtRecord: String,
-    score: Double,
+    pdbqtRecord:    String,
+    score:          Double,
     scoreHistogram: Array[Double],
-    badIn: Int,
-    goodIn: Int) = {
+    badIn:          Int,
+    goodIn:         Int) = {
     val it = SBVSPipeline.CDKInit(pdbqtRecord)
     val strWriter = new StringWriter()
     val writer = new SDFWriter(strWriter)
@@ -97,7 +96,7 @@ object ConformersWithSignsPipeline extends Serializable {
       }
     }
     writer.close
-    strWriter.toString() //return the molecule  
+    strWriter.toString() //return the molecule
   }
 
   private def insertModels(receptorPath: String, rModel: InductiveClassifier[MLlibSVM, LabeledPoint], rPdbCode: String, jdbcHostname: String) {
@@ -146,16 +145,18 @@ object ConformersWithSignsPipeline extends Serializable {
     val paramsAsRow = predictions.map {
       case (sdfmol, predSet) =>
         val lId = PosePipeline.parseId(sdfmol)
-        val lPrediction = if (predSet == Set(0.0)) "BAD"
-        else if (predSet == Set(1.0)) "GOOD"
-        else "UNKNOWN"
+        val lPrediction = predSet.toSeq(0) match {
+          case 0.0 => "BAD"
+          case 1.0 => "GOOD"
+          case _   => "UNKNOWN"
+        }
         (lId, lPrediction)
     }.map {
       case (lId, lPrediction) =>
         Row(rName, rPdbCode, lId, lPrediction)
     }
 
-    //Creating sqlContext Using sparkContext  
+    //Creating sqlContext Using sparkContext
     val sqlContext = new org.apache.spark.sql.SQLContext(sc)
     val schema =
       StructType(
@@ -175,7 +176,7 @@ object ConformersWithSignsPipeline extends Serializable {
     //jdbc mysql url - destination database is named "db_profile"
     val url = "jdbc:mysql://" + jdbcHostname + ":3306/db_profile"
 
-    //destination database table 
+    //destination database table
     val table = "PREDICTED_LIGANDS"
 
     //write data from spark dataframe to database
@@ -186,21 +187,21 @@ object ConformersWithSignsPipeline extends Serializable {
 }
 
 private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
-    extends SBVSPipeline(rdd) with ConformersWithSignsTransforms {
+  extends SBVSPipeline(rdd) with ConformersWithSignsTransforms {
 
   override def dockWithML(
-    receptorPath: String,
-    pdbCode: String,
-    jdbcHostname : String,
-    dsInitSize: Int,
-    dsIncreSize: Int,
+    receptorPath:       String,
+    pdbCode:            String,
+    jdbcHostname:       String,
+    dsInitSize:         Int,
+    dsIncreSize:        Int,
     calibrationPercent: Double,
-    numIterations: Int,
-    badIn: Int,
-    goodIn: Int,
-    singleCycle: Boolean,
-    stratified: Boolean,
-    confidence: Double) = {
+    numIterations:      Int,
+    badIn:              Int,
+    goodIn:             Int,
+    singleCycle:        Boolean,
+    stratified:         Boolean,
+    confidence:         Double) = {
 
     //initializations
     var poses: RDD[String] = null
@@ -284,7 +285,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       //Splitting data into Proper training set and calibration set
       val Array(properTraining, calibration) = lpDsTrain.randomSplit(Array(1 - calibrationPercent, calibrationPercent), seed = 11L)
 
-      //Train ICP  
+      //Train ICP
       val svm = new MLlibSVM(properTraining.persist(StorageLevel.MEMORY_AND_DISK_SER), numIterations)
       //SVM based ICP Classifier (our model)
       val icp = ICP.trainClassifier(svm, nOfClasses = 2, calibration.collect)
