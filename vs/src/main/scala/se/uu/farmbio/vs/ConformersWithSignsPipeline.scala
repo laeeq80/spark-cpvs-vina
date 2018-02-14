@@ -145,11 +145,9 @@ object ConformersWithSignsPipeline extends Serializable {
     val paramsAsRow = predictions.map {
       case (sdfmol, predSet) =>
         val lId = PosePipeline.parseId(sdfmol)
-        val lPrediction = predSet.toSeq(0) match {
-          case 0.0 => "BAD"
-          case 1.0 => "GOOD"
-          case _   => "UNKNOWN"
-        }
+        val lPrediction = if (predSet == Set(0.0)) "BAD"
+        else if (predSet == Set(1.0)) "GOOD"
+        else "UNKNOWN"
         (lId, lPrediction)
     }.map {
       case (lId, lPrediction) =>
