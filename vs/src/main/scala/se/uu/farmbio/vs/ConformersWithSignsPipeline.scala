@@ -98,6 +98,19 @@ object ConformersWithSignsPipeline extends Serializable {
     writer.close
     strWriter.toString() //return the molecule
   }
+  
+   private def getLabel(sdfRecord: String) = {
+
+    val it = SBVSPipeline.CDKInit(sdfRecord)
+    var label: String = null
+    while (it.hasNext()) {
+      val mol = it.next
+      label = mol.getProperty("Label")
+
+    }
+    label
+
+  }
 
   private def insertModels(receptorPath: String, rModel: InductiveClassifier[MLlibSVM, LabeledPoint], rPdbCode: String, jdbcHostname: String) {
     //Getting filename from Path and trimming the extension
@@ -211,6 +224,8 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
     var effCounter: Int = 0
     var calibrationSizeDynamic: Int = 0
     var dsInit: RDD[String] = null
+    var dsBadInTrainingSet: RDD[String] = null
+    var dsGoodInTrainingSet: RDD[String] = null
 
     //Converting complete dataset (dsComplete) to feature vector required for conformal prediction
     //We also need to keep intact the poses so at the end we know
@@ -273,6 +288,31 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       } else {
         dsTrain = dsTrain.union(dsTopAndBottom).persist(StorageLevel.DISK_ONLY)
       }
+      
+      logInfo("JOB_INFO: Training set size in cycle " + counter + " is " + dsTrain.count)
+
+      //Counting zeroes and ones in each training set in each cycle
+      if (dsTrain == null) {
+        dsBadInTrainingSet = dsTopAndBottom.filter {
+          case (mol) => ConformersWithSignsPipeline.getLabel(mol) == "0.0"
+        }
+      } else {
+        dsBadInTrainingSet = dsTrain.filter {
+          case (mol) => ConformersWithSignsPipeline.getLabel(mol) == "0.0"
+        }
+      }
+
+      if (dsTrain == null) {
+        dsGoodInTrainingSet = dsTopAndBottom.filter {
+          case (mol) => ConformersWithSignsPipeline.getLabel(mol) == "1.0"
+        }
+      } else {
+        dsGoodInTrainingSet = dsTrain.filter {
+          case (mol) => ConformersWithSignsPipeline.getLabel(mol) == "1.0"
+        }
+      }
+      logInfo("JOB_INFO: Zero Labeled Mols in Training set in cycle " + counter + " are " + dsBadInTrainingSet.count)
+      logInfo("JOB_INFO: One Labeled Mols in Training set in cycle " + counter + " are " + dsGoodInTrainingSet.count)
 
       //Converting SDF training set to LabeledPoint(label+sign) required for conformal prediction
       val lpDsTrain = dsTrain.flatMap {
@@ -327,13 +367,13 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         effCounter = 0
       }
       counter = counter + 1
-      if (effCounter >= 2) {
+      //if (effCounter >= 2) {
         dsOnePredicted = predictions
           .filter { case (sdfmol, prediction) => (prediction == Set(1.0)) }
           .map { case (sdfmol, prediction) => sdfmol }
         ConformersWithSignsPipeline.insertModels(receptorPath, icp, pdbCode, jdbcHostname)
         ConformersWithSignsPipeline.insertPredictions(receptorPath, pdbCode, jdbcHostname, predictions, sc)
-      }
+      //}
     } while (effCounter < 2 && !singleCycle)
 
     dsOnePredicted = dsOnePredicted.subtract(poses)
