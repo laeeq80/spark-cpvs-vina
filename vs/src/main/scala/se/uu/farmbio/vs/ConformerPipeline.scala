@@ -18,6 +18,8 @@ import org.apache.spark.Logging
 
 import org.openscience.cdk.io.SDFWriter
 import org.openscience.cdk.interfaces.IAtomContainer
+import org.openscience.cdk.smiles.SmilesParser
+import org.openscience.cdk.DefaultChemObjectBuilder
 import scala.tools.nsc.doc.model.Public
 
 trait ConformerTransforms {
@@ -128,6 +130,13 @@ object ConformerPipeline extends Logging {
     pdbqtToSdfRDD
   }
 
+  //Specially implemented for CPVSAPI
+  def smilesToIAtomContainer(smiles: String) = {
+    val smilesParser = new SmilesParser(DefaultChemObjectBuilder.getInstance())
+    val molecule = smilesParser.parseSmiles(smiles)
+    molecule
+  }
+
   def sdfStringToIAtomContainer(sdfRecord: String) = {
 
     val it = SBVSPipeline.CDKInit(sdfRecord)
@@ -154,7 +163,7 @@ object ConformerPipeline extends Logging {
     writer.close
     strWriter.toString() //return the molecule
   }
-  
+
   def cleanPoses(sdfRecord: String, signExist: Boolean) = {
     val it = SBVSPipeline.CDKInit(sdfRecord)
     val strWriter = new StringWriter()
