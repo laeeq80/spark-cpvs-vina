@@ -130,13 +130,6 @@ object ConformerPipeline extends Logging {
     pdbqtToSdfRDD
   }
 
-  //Specially implemented for CPVSAPI
-  def smilesToIAtomContainer(smiles: String) = {
-    val smilesParser = new SmilesParser(DefaultChemObjectBuilder.getInstance())
-    val molecule = smilesParser.parseSmiles(smiles)
-    molecule
-  }
-
   def sdfStringToIAtomContainer(sdfRecord: String) = {
 
     val it = SBVSPipeline.CDKInit(sdfRecord)
