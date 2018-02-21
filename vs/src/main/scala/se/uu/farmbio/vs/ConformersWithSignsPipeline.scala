@@ -98,8 +98,8 @@ object ConformersWithSignsPipeline extends Serializable {
     writer.close
     strWriter.toString() //return the molecule
   }
-  
-   private def getLabel(sdfRecord: String) = {
+
+  private def getLabel(sdfRecord: String) = {
 
     val it = SBVSPipeline.CDKInit(sdfRecord)
     var label: String = null
@@ -288,7 +288,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       } else {
         dsTrain = dsTrain.union(dsTopAndBottom).persist(StorageLevel.DISK_ONLY)
       }
-      
+
       logInfo("JOB_INFO: Training set size in cycle " + counter + " is " + dsTrain.count)
 
       //Counting zeroes and ones in each training set in each cycle
@@ -368,29 +368,31 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       }
       counter = counter + 1
       //if (effCounter >= 2) {
-        dsOnePredicted = predictions
-          .filter { case (sdfmol, prediction) => (prediction == Set(1.0)) }
-          .map { case (sdfmol, prediction) => sdfmol }
-        ConformersWithSignsPipeline.insertModels(receptorPath, icp, pdbCode, jdbcHostname)
-        ConformersWithSignsPipeline.insertPredictions(receptorPath, pdbCode, jdbcHostname, predictions, sc)
+      dsOnePredicted = predictions
+        .filter { case (sdfmol, prediction) => (prediction == Set(1.0)) }
+        .map { case (sdfmol, prediction) => sdfmol }.cache()
+      ConformersWithSignsPipeline.insertModels(receptorPath, icp, pdbCode, jdbcHostname)
+      ConformersWithSignsPipeline.insertPredictions(receptorPath, pdbCode, jdbcHostname, predictions, sc)
       //}
     } while (effCounter < 2 && !singleCycle)
 
-    dsOnePredicted = dsOnePredicted.subtract(poses)
+    if (dsOnePredicted.count() > 0) {
+      dsOnePredicted = dsOnePredicted.subtract(poses)
 
-    val dsOnePredictedToDock = dsOnePredicted.mapPartitions(x => Seq(x.mkString("\n")).iterator)
+      val dsOnePredictedToDock = dsOnePredicted.mapPartitions(x => Seq(x.mkString("\n")).iterator)
 
-    val dsDockOne = ConformerPipeline.getDockingRDD(receptorPath, false, sc, dsOnePredictedToDock, true)
-      .map {
-        case (dirtyMol) => ConformerPipeline.cleanPoses(dirtyMol, true)
-      }
-      .flatMap(SBVSPipeline.splitSDFmolecules)
+      val dsDockOne = ConformerPipeline.getDockingRDD(receptorPath, false, sc, dsOnePredictedToDock, true)
+        .map {
+          case (dirtyMol) => ConformerPipeline.cleanPoses(dirtyMol, true)
+        }
+        .flatMap(SBVSPipeline.splitSDFmolecules)
 
-    //Keeping rest of processed poses i.e. dsOne mol poses
-    if (poses == null)
-      poses = dsDockOne
-    else
-      poses = poses.union(dsDockOne)
+      //Keeping rest of processed poses i.e. dsOne mol poses
+      if (poses == null)
+        poses = dsDockOne
+      else
+        poses = poses.union(dsDockOne)
+    }
     new PosePipeline(poses)
   }
 

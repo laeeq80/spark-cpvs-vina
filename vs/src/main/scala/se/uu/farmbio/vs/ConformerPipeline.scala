@@ -200,7 +200,8 @@ object ConformerPipeline extends Logging {
         mol.setProperty("Score", score)
 
         //Fetching title from pdbqt Name REMARK to create sdf title tag
-        val title = res.slice(res.indexOf("=") + 2, res.indexOf("x")).trim
+        var title = res.slice(res.indexOf("=") + 2, res.indexOf("x")).trim
+        if (title =="") title = "NoTitleFound"
         mol.setProperty("cdk:Title", title)
 
         //Removing pdbqt junk after getting useful stuff HEHEHE

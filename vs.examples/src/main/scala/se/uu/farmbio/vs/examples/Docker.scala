@@ -56,7 +56,6 @@ object Docker extends Logging {
         .required()
         .text("path to top output poses")
         .action((x, c) => c.copy(topPosesPath = x))
-
     }
 
     parser.parse(args, defaultParams).map { params =>

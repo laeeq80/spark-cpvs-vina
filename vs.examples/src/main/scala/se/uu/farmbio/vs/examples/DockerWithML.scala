@@ -27,7 +27,6 @@ object DockerWithML extends Logging {
     sig2IdPath: String = null,
     topPosesPath: String = null,
     receptorFile: String = null,
-    oeLicensePath: String = null,
     firstFile: String = null,
     secondFile: String = null,
     signatureFile: String = null,
@@ -41,6 +40,7 @@ object DockerWithML extends Logging {
     singleCycle: Boolean = false,
     stratified: Boolean = false,
     confidence: Double = 0.2,
+    posesCheckpointPath: String = null,
     size: String = "30",
     pdbCode: String = null,
     jdbcHostname: String = null)
@@ -80,6 +80,9 @@ object DockerWithML extends Logging {
         .required()
         .text("path to write and read intermediate signatures")
         .action((x, c) => c.copy(signatureFile = x))
+      opt[String]("posesCheckpointPath")
+        .text("path to checkpoint all of the output poses before taking the top 10 (default: null)")
+        .action((x, c) => c.copy(posesCheckpointPath = x))
       opt[Int]("dsInitSize")
         .text("initial Data Size to be docked (default: 100)")
         .action((x, c) => c.copy(dsInitSize = x))
@@ -135,9 +138,7 @@ object DockerWithML extends Logging {
     //Init Spark
     val conf = new SparkConf()
       .setAppName("DockerWithML1")
-    if (params.oeLicensePath != null) {
-      conf.setExecutorEnv("OE_LICENSE", params.oeLicensePath)
-    }
+    
     if (params.master != null) {
       conf.setMaster(params.master)
     }
@@ -204,7 +205,13 @@ object DockerWithML extends Logging {
         params.singleCycle,
         params.stratified,
         params.confidence)
-
+    
+    val cachedPoses = conformerWithSigns.getMolecules
+    
+    if (params.posesCheckpointPath != null) {
+      cachedPoses.saveAsTextFile(params.posesCheckpointPath)
+    }
+        
     val predictedTopPoses = conformerWithSigns.getTopPoses(params.topN)
 
     sc2.parallelize(predictedTopPoses, 1).saveAsTextFile(params.topPosesPath)
