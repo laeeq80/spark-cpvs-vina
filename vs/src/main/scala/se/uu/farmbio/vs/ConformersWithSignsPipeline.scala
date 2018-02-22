@@ -1,7 +1,5 @@
 package se.uu.farmbio.vs
 
-import se.uu.farmbio.cp.ICP
-import se.uu.farmbio.cp.alg.SVM
 import org.apache.spark.rdd.RDD
 import org.apache.spark.Logging
 import org.apache.spark.mllib.regression.LabeledPoint
@@ -9,7 +7,8 @@ import org.apache.spark.mllib.linalg.{ Vector, Vectors }
 import org.openscience.cdk.io.SDFWriter
 import java.io.{StringWriter, PrintWriter}
 import org.apache.spark.storage.StorageLevel
-import se.uu.farmbio.cp.ICPClassifierModel
+import se.uu.it.cp
+import se.uu.it.cp.{ ICP, InductiveClassifier }
 
 trait ConformersWithSignsTransforms {
   def dockWithML(
@@ -223,24 +222,17 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       val lpDsTrain = dsTrain.flatMap {
         sdfmol => ConformersWithSignsPipeline.getLPRDD(sdfmol)
       }
-
+      
       //Step 8 Training
-      //Train icps
-      calibrationSizeDynamic = (dsTrain.count * calibrationPercent).toInt
-      val (calibration, properTraining) = ICP.calibrationSplit(
-        lpDsTrain, calibrationSizeDynamic, stratified)
+      //Splitting data into Proper training set and calibration set
+      val Array(properTraining, calibration) = lpDsTrain.randomSplit(Array(1 - calibrationPercent, calibrationPercent), seed = 11L)
 
       //Train ICP
-      val svm = new SVM(properTraining.persist(StorageLevel.MEMORY_AND_DISK_SER), numIterations)
+      val svm = new MLlibSVM(properTraining.persist(StorageLevel.MEMORY_AND_DISK_SER), numIterations)
       //SVM based ICP Classifier (our model)
-      val icp = ICP.trainClassifier(svm, numClasses = 2, calibration)
-      
-      //Saving Models
-      sc.parallelize(Seq(icp), 1).saveAsObjectFile(modelPath + counter)
-      logInfo("JOB_INFO: Model saved in cycle " + counter + " at " + modelPath + counter)
-      
-      //Loading Model for testing purposes
-      val loadedIcpModel = sc.objectFile[ICPClassifierModel[SVM]](modelPath + counter).first()
+      val icp = ICP.trainClassifier(svm, nOfClasses = 2, calibration.collect)
+
+      logInfo("JOB_INFO: Training Completed in cycle " + counter)
       
       parseScoreRDD.unpersist()
       lpDsTrain.unpersist()
@@ -250,7 +242,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
 
       //Step 9 Prediction using our model on complete dataset
       val predictions = fvDsComplete.map {
-        case (sdfmol, predictionData) => (sdfmol, loadedIcpModel.predict(predictionData, confidence))
+        case (sdfmol, predictionData) => (sdfmol, icp.predict(predictionData.toArray, confidence))
       }
 
       val dsZeroPredicted: RDD[(String)] = predictions

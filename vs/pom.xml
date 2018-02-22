@@ -72,9 +72,9 @@
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
-			<groupId>se.uu.farmbio</groupId>
+			<groupId>se.uu.it</groupId>
 			<artifactId>cp</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
+			<version>0.1.0</version>
 		</dependency>
 	</dependencies>
 
