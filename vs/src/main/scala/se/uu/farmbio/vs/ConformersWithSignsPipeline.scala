@@ -21,8 +21,7 @@ trait ConformersWithSignsTransforms {
     goodIn: Int,
     singleCycle: Boolean,
     stratified: Boolean,
-    confidence: Double,
-    modelPath: String): SBVSPipeline with PoseTransforms
+    confidence: Double): SBVSPipeline with PoseTransforms
 
 }
 
@@ -116,8 +115,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
     goodIn: Int,
     singleCycle: Boolean,
     stratified: Boolean,
-    confidence: Double,
-    modelPath: String) = {
+    confidence: Double) = {
 
     //initializations
     var poses: RDD[String] = null

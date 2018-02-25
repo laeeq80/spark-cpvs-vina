@@ -18,7 +18,6 @@ object DockerWithML extends Logging {
     posesFileWithSigns: String = null,
     topPosesPath: String = null,
     receptorFile: String = null,
-    modelPath: String = null,
     firstFile: String = null,
     secondFile: String = null,
     dsInitSize: Int = 100,
@@ -51,13 +50,7 @@ object DockerWithML extends Logging {
       arg[String]("<top-poses-path>")
         .required()
         .text("path to top output poses")
-        .action((x, c) => c.copy(topPosesPath = x))
-      
-      arg[String]("<model-path>")
-        .required()
-        .text("path to save model")
-        .action((x, c) => c.copy(modelPath = x))  
-        
+        .action((x, c) => c.copy(topPosesPath = x))       
       arg[String]("<first-file>")
         .required()
         .text("path to input file with top N mols")
@@ -147,8 +140,7 @@ object DockerWithML extends Logging {
         params.goodIn,
         params.singleCycle,
         params.stratified,
-        params.confidence,
-        params.modelPath)
+        params.confidence)
       .getTopPoses(params.topN)
 
     sc2.parallelize(conformerWithSigns, 1).saveAsTextFile(params.topPosesPath)
