@@ -175,6 +175,10 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       }
 
       //Step 5 and 6 Computing dsTopAndBottom
+      //val dsTop = //Use top
+      //val dsBottom = //Use TakeOrdered
+      //val dsTopAndBottom = dsTop.union(dsBottom)
+      
       val parseScoreRDD = dsDock.map(PosePipeline.parseScore).persist(StorageLevel.MEMORY_ONLY)
       val parseScoreHistogram = parseScoreRDD.histogram(10)
 
