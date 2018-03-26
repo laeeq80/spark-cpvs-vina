@@ -18,8 +18,8 @@ trait ConformersWithSignsTransforms {
     dsIncreSize:        Int,
     calibrationPercent: Double,
     numIterations:      Int,
-    badIn:              Int,
-    goodIn:             Int,
+    topPer:             Float,
+    bottomPer:          Float,
     singleCycle:        Boolean,
     stratified:         Boolean,
     confidence:         Double): SBVSPipeline with PoseTransforms
@@ -75,7 +75,7 @@ object ConformersWithSignsPipeline extends Serializable with Logging {
     strWriter.toString() //return the molecule
 
   }
-
+  
   private def getLabeledTopAndBottom(poses: RDD[String], dsSize: Int, topPer: Float, bottomPer: Float): RDD[String] = {
     //what is top % of dsSize
     val topN = round((topPer / 100) * dsSize)
@@ -90,44 +90,31 @@ object ConformersWithSignsPipeline extends Serializable with Logging {
       case (mol) => (mol, PosePipeline.parseScore(mol))
     }
 
-    //Map Partitions and sortBy Score (cheap operation, no shuffles)
-    val topPerPartition = molAndScore.mapPartitions(
-      iter => {
-        iter.toArray.sortWith((x, y) => x._2.compare(y._2) < 0).take(topN).iterator
-      },
-      preservesPartitioning = true)
-
-    val bottomPerPartition = molAndScore.mapPartitions(
-      iter => {
-        iter.toArray.sortWith((x, y) => x._2.compare(y._2) < 0).takeRight(bottomN).iterator
-      },
-      preservesPartitioning = true)
-
-    //Sort the extracted RDD (a little expansive)
-    val top = topPerPartition.sortBy { case (mol, score) => score }
-      .zipWithIndex()
+    //Sort whole DsInit by Score
+    val top = molAndScore.sortBy { case (mol, score) => score }
+      .zipWithIndex() 
       .filter { case ((mol, score), index) => index < topN }
       .map { case ((mol, score), index) => mol }
-
+     
+    val bottom = molAndScore.sortBy { case (mol, score) => -score }
+      .zipWithIndex()
+      .filter { x => x._2 < bottomN }
+      .map { case ((mol, score), index) => mol }
+    
     //Labeling the top molecules with 1.0
     val labledTop = top.map { topMols =>
       labelPose(topMols, 1.0)
     }
-
-    val bottom = bottomPerPartition.sortBy { case (mol, score) => -score }
-      .zipWithIndex()
-      .filter { x => x._2 < bottomN }
-      .map { case ((mol, score), index) => mol }
-
     //Labeling the bottom molecules with 0.0
     val labledBottom = bottom.map { bottomMols =>
       labelPose(bottomMols, 0.0)
     }
 
     val topAndBottom = labledTop.union(labledBottom)
+    
     topAndBottom
   }
-
+  
   private def getLabel(sdfRecord: String) = {
 
     val it = SBVSPipeline.CDKInit(sdfRecord)
@@ -152,8 +139,8 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
     dsIncreSize:        Int,
     calibrationPercent: Double,
     numIterations:      Int,
-    badIn:              Int,
-    goodIn:             Int,
+    topPer:             Float,
+    bottomPer:          Float,
     singleCycle:        Boolean,
     stratified:         Boolean,
     confidence:         Double) = {
@@ -219,9 +206,9 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
 
       //Step 5 and 6 Computing dsTopAndBottom and label it
       if (dsTopAndBottom == null) {
-        dsTopAndBottom = ConformersWithSignsPipeline.getLabeledTopAndBottom(dsDock, dsInitSize, 3.5f, 0.15f)
+        dsTopAndBottom = ConformersWithSignsPipeline.getLabeledTopAndBottom(dsDock, dsInitSize, topPer, bottomPer)
       } else {
-        dsTopAndBottom = ConformersWithSignsPipeline.getLabeledTopAndBottom(dsDock, dsIncreSize, 3.5f, 0.15f)
+        dsTopAndBottom = ConformersWithSignsPipeline.getLabeledTopAndBottom(dsDock, dsIncreSize, topPer, bottomPer)
       }
 
       logInfo("JOB_INFO: dsTopAndBottom in cycle " + counter + " is " + dsTopAndBottom.count)
@@ -288,12 +275,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       dsOnePredicted = predictions
         .filter { case (sdfmol, prediction) => (prediction == Set(1.0)) }
         .map { case (sdfmol, prediction) => sdfmol }.cache
-      val dsBothUnknown: RDD[(String)] = predictions
-        .filter { case (sdfmol, prediction) => (prediction == Set(0.0, 1.0)) }
-        .map { case (sdfmol, prediction) => sdfmol }
-      val dsEmptyUnknown: RDD[(String)] = predictions
-        .filter { case (sdfmol, prediction) => (prediction == Set()) }
-        .map { case (sdfmol, prediction) => sdfmol }
+     
 
       //Step 10 Subtracting {0} moles from dataset which has not been previously subtracted
       if (dsZeroRemoved == null)
@@ -305,14 +287,13 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
 
       logInfo("JOB_INFO: Number of bad mols predicted in cycle " +
         counter + " are " + dsZeroPredicted.count)
+      
       logInfo("JOB_INFO: Number of bad mols removed in cycle " +
-        counter + " are " + dsZeroRemoved.count)
+        counter + " are " + dsZeroRemoved.count)  
+      
       logInfo("JOB_INFO: Number of good mols predicted in cycle " +
         counter + " are " + dsOnePredicted.count)
-      logInfo("JOB_INFO: Number of Both Unknown mols predicted in cycle " +
-        counter + " are " + dsBothUnknown.count)
-      logInfo("JOB_INFO: Number of Empty Unknown mols predicted in cycle " +
-        counter + " are " + dsEmptyUnknown.count)
+    
 
       //Keeping all previous removed bad mols
       if (cumulativeZeroRemoved == null)

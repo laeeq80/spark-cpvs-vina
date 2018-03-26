@@ -25,8 +25,8 @@ object DockerWithML extends Logging {
     calibrationPercent: Double = 0.3,
     numIterations: Int = 50,
     topN: Int = 30,
-    badIn: Int = 9,
-    goodIn: Int = 6,
+    topPer: Double=3.5,
+    bottomPer: Double=0.15,
     singleCycle: Boolean = false,
     stratified: Boolean = false,
     confidence: Double = 0.2,
@@ -71,12 +71,12 @@ object DockerWithML extends Logging {
       opt[Int]("numIterations")
         .text("number of iternations for the ML model training (default: 100)")
         .action((x, c) => c.copy(numIterations = x))
-      opt[Int]("badIn")
-        .text("UpperBound of bad bins")
-        .action((x, c) => c.copy(badIn = x))
-      opt[Int]("goodIn")
-        .text("LowerBound of good bins")
-        .action((x, c) => c.copy(goodIn = x))
+      opt[Double]("topPer")
+        .text("percentage taken as topMols from DsInit for training set")
+        .action((x, c) => c.copy(topPer = x))
+      opt[Double]("bottomPer")
+        .text("percentage taken as bottomMols from DsInit for training set")
+        .action((x, c) => c.copy(bottomPer = x))
       opt[Int]("topN")
         .text("number of top scoring poses to extract (default: 30).")
         .action((x, c) => c.copy(topN = x))
@@ -138,8 +138,8 @@ object DockerWithML extends Logging {
         params.dsIncreSize,
         params.calibrationPercent,
         params.numIterations,
-        params.badIn,
-        params.goodIn,
+        params.topPer.toFloat,
+        params.bottomPer.toFloat,
         params.singleCycle,
         params.stratified,
         params.confidence)
@@ -162,8 +162,7 @@ object DockerWithML extends Logging {
       for (j <- 0 to Array2.length - 1)
         if (Array1(i) == Array2(j))
           counter = counter + 1
-    logInfo("JOB_INFO: Good bins ranges from 0-" + params.goodIn +
-      " and bad bins ranges from " + params.badIn + "-10")
+  
     logInfo("JOB_INFO: Number of molecules matched are " + counter)
     logInfo("JOB_INFO: Percentage of same results is " + (counter / params.topN) * 100)
     sc2.stop()
