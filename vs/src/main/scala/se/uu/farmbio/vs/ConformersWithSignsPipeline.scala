@@ -20,6 +20,7 @@ import se.uu.it.cp
 import se.uu.it.cp.{ ICP, InductiveClassifier }
 
 import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectOutputStream, StringWriter }
+import scala.math.round
 
 trait ConformersWithSignsTransforms {
   def dockWithML(
@@ -30,14 +31,14 @@ trait ConformersWithSignsTransforms {
     dsIncreSize:        Int,
     calibrationPercent: Double,
     numIterations:      Int,
-    badIn:              Int,
-    goodIn:             Int,
+    topPer:             Float,
+    bottomPer:          Float,
     singleCycle:        Boolean,
     stratified:         Boolean,
     confidence:         Double): SBVSPipeline with PoseTransforms
 }
 
-object ConformersWithSignsPipeline extends Serializable {
+object ConformersWithSignsPipeline extends Serializable with Logging {
 
   private def getLPRDD(poses: String) = {
     val it = SBVSPipeline.CDKInit(poses)
@@ -71,7 +72,62 @@ object ConformersWithSignsPipeline extends Serializable {
 
     res //return the FeatureVector
   }
+  
+  private def labelPose(sdfRecord: String, label: Double): String = {
+    val it = SBVSPipeline.CDKInit(sdfRecord)
+    val strWriter = new StringWriter()
+    val writer = new SDFWriter(strWriter)
+    while (it.hasNext()) {
+      val mol = it.next
+      mol.removeProperty("cdk:Remark")
+      mol.setProperty("Label", label)
+      writer.write(mol)
+    }
+    writer.close
+    strWriter.toString() //return the molecule
 
+  }
+  
+  private def getLabeledTopAndBottom(poses: RDD[String], dsSize: Int, topPer: Float, bottomPer: Float): RDD[String] = {
+    //what is top % of dsSize
+    val topN = round((topPer / 100) * dsSize)
+    logInfo("JOB_INFO: topN is " + topN)
+
+    //what is bottom % of dsSize
+    val bottomN = round((bottomPer / 100) * dsSize)
+    logInfo("JOB_INFO: bottomN is " + bottomN)
+
+    //Get scores with mols
+    val molAndScore = poses.map {
+      case (mol) => (mol, PosePipeline.parseScore(mol))
+    }
+
+    //Sort whole DsInit by Score
+    val top = molAndScore.sortBy { case (mol, score) => score }
+      .zipWithIndex() 
+      .filter { case ((mol, score), index) => index < topN }
+      .map { case ((mol, score), index) => mol }
+     
+    val bottom = molAndScore.sortBy { case (mol, score) => -score }
+      .zipWithIndex()
+      .filter { x => x._2 < bottomN }
+      .map { case ((mol, score), index) => mol }
+    
+    //Labeling the top molecules with 1.0
+    val labledTop = top.map { topMols =>
+      labelPose(topMols, 1.0)
+    }
+    //Labeling the bottom molecules with 0.0
+    val labledBottom = bottom.map { bottomMols =>
+      labelPose(bottomMols, 0.0)
+    }
+
+    val topAndBottom = labledTop.union(labledBottom)
+    
+    topAndBottom
+  }
+  
+  @deprecated
   private def labelTopAndBottom(
     pdbqtRecord:    String,
     score:          Double,
@@ -208,8 +264,8 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
     dsIncreSize:        Int,
     calibrationPercent: Double,
     numIterations:      Int,
-    badIn:              Int,
-    goodIn:             Int,
+    topPer:             Float,
+    bottomPer:          Float,
     singleCycle:        Boolean,
     stratified:         Boolean,
     confidence:         Double) = {
@@ -226,6 +282,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
     var dsInit: RDD[String] = null
     var dsBadInTrainingSet: RDD[String] = null
     var dsGoodInTrainingSet: RDD[String] = null
+    var dsTopAndBottom: RDD[String] = null
 
     //Converting complete dataset (dsComplete) to feature vector required for conformal prediction
     //We also need to keep intact the poses so at the end we know
@@ -272,15 +329,14 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         poses = poses.union(dsDock)
       }
 
-      //Step 5 and 6 Computing dsTopAndBottom
-      val parseScoreRDD = dsDock.map(PosePipeline.parseScore).persist(StorageLevel.MEMORY_ONLY)
-      val parseScoreHistogram = parseScoreRDD.histogram(10)
+      //Step 5 and 6 Computing dsTopAndBottom and label it
+      if (dsTopAndBottom == null) {
+        dsTopAndBottom = ConformersWithSignsPipeline.getLabeledTopAndBottom(dsDock, dsInitSize, topPer, bottomPer)
+      } else {
+        dsTopAndBottom = ConformersWithSignsPipeline.getLabeledTopAndBottom(dsDock, dsIncreSize, topPer, bottomPer)
+      }
 
-      val dsTopAndBottom = dsDock.map {
-        case (mol) =>
-          val score = PosePipeline.parseScore(mol)
-          ConformersWithSignsPipeline.labelTopAndBottom(mol, score, parseScoreHistogram._1, badIn, goodIn)
-      }.map(_.trim).filter(_.nonEmpty)
+      logInfo("JOB_INFO: dsTopAndBottom in cycle " + counter + " is " + dsTopAndBottom.count)
 
       //Step 7 Union dsTrain and dsTopAndBottom
       if (dsTrain == null) {
@@ -328,7 +384,6 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       //SVM based ICP Classifier (our model)
       val icp = ICP.trainClassifier(svm, nOfClasses = 2, calibration.collect)
 
-      parseScoreRDD.unpersist()
       lpDsTrain.unpersist()
       properTraining.unpersist()
 
@@ -385,7 +440,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         .map {
           case (dirtyMol) => ConformerPipeline.cleanPoses(dirtyMol, true)
         }
-        .flatMap(SBVSPipeline.splitSDFmolecules)
+        .flatMap(SBVSPipeline.splitSDFmolecules).persist(StorageLevel.DISK_ONLY)
 
       //Keeping rest of processed poses i.e. dsOne mol poses
       if (poses == null)
