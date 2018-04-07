@@ -14,6 +14,7 @@ import org.apache.spark.sql.types._
 import java.nio.file.Paths
 
 import org.apache.commons.io.FilenameUtils
+import org.apache.spark.storage.StorageLevel
 
 /**
  * @author laeeq
@@ -206,12 +207,6 @@ object DockerWithML extends Logging {
         params.singleCycle,
         params.stratified,
         params.confidence)
-
-    val cachedPoses = conformerWithSigns.getMolecules
-
-    if (params.posesCheckpointPath != null) {
-      cachedPoses.saveAsTextFile(params.posesCheckpointPath)
-    }
 
     val predictedTopPoses = conformerWithSigns.getTopPoses(params.topN)
 

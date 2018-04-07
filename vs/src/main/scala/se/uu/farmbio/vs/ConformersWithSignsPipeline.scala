@@ -72,7 +72,7 @@ object ConformersWithSignsPipeline extends Serializable with Logging {
 
     res //return the FeatureVector
   }
-  
+
   private def labelPose(sdfRecord: String, label: Double): String = {
     val it = SBVSPipeline.CDKInit(sdfRecord)
     val strWriter = new StringWriter()
@@ -87,7 +87,7 @@ object ConformersWithSignsPipeline extends Serializable with Logging {
     strWriter.toString() //return the molecule
 
   }
-  
+
   private def getLabeledTopAndBottom(poses: RDD[String], dsSize: Int, topPer: Float, bottomPer: Float): RDD[String] = {
     //what is top % of dsSize
     val topN = round((topPer / 100) * dsSize)
@@ -104,15 +104,15 @@ object ConformersWithSignsPipeline extends Serializable with Logging {
 
     //Sort whole DsInit by Score
     val top = molAndScore.sortBy { case (mol, score) => score }
-      .zipWithIndex() 
+      .zipWithIndex()
       .filter { case ((mol, score), index) => index < topN }
       .map { case ((mol, score), index) => mol }
-     
+
     val bottom = molAndScore.sortBy { case (mol, score) => -score }
       .zipWithIndex()
       .filter { x => x._2 < bottomN }
       .map { case ((mol, score), index) => mol }
-    
+
     //Labeling the top molecules with 1.0
     val labledTop = top.map { topMols =>
       labelPose(topMols, 1.0)
@@ -123,10 +123,10 @@ object ConformersWithSignsPipeline extends Serializable with Logging {
     }
 
     val topAndBottom = labledTop.union(labledBottom)
-    
+
     topAndBottom
   }
-  
+
   @deprecated
   private def labelTopAndBottom(
     pdbqtRecord:    String,
@@ -274,7 +274,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
     var poses: RDD[String] = null
     var dsTrain: RDD[String] = null
     var dsOnePredicted: RDD[(String)] = null
-    var ds: RDD[String] = rdd.flatMap(SBVSPipeline.splitSDFmolecules).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    var ds: RDD[String] = rdd.flatMap(SBVSPipeline.splitSDFmolecules).persist(StorageLevel.DISK_ONLY)
     var eff: Double = 0.0
     var counter: Int = 1
     var effCounter: Int = 0
@@ -422,16 +422,16 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         effCounter = 0
       }
       counter = counter + 1
-      //if (effCounter >= 2) {
-      dsOnePredicted = predictions
-        .filter { case (sdfmol, prediction) => (prediction == Set(1.0)) }
-        .map { case (sdfmol, prediction) => sdfmol }.cache()
-      ConformersWithSignsPipeline.insertModels(receptorPath, icp, pdbCode, jdbcHostname)
-      ConformersWithSignsPipeline.insertPredictions(receptorPath, pdbCode, jdbcHostname, predictions, sc)
-      //}
+      if (effCounter >= 2) {
+        dsOnePredicted = predictions
+          .filter { case (sdfmol, prediction) => (prediction == Set(1.0)) }
+          .map { case (sdfmol, prediction) => sdfmol }
+        ConformersWithSignsPipeline.insertModels(receptorPath, icp, pdbCode, jdbcHostname)
+        ConformersWithSignsPipeline.insertPredictions(receptorPath, pdbCode, jdbcHostname, predictions, sc)
+      }
     } while (effCounter < 2 && !singleCycle)
 
-    if (dsOnePredicted.count() > 0) {
+    if (dsOnePredicted != null) {
       dsOnePredicted = dsOnePredicted.subtract(poses)
 
       val dsOnePredictedToDock = dsOnePredicted.mapPartitions(x => Seq(x.mkString("\n")).iterator)
@@ -440,8 +440,9 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         .map {
           case (dirtyMol) => ConformerPipeline.cleanPoses(dirtyMol, true)
         }
-        .flatMap(SBVSPipeline.splitSDFmolecules).persist(StorageLevel.DISK_ONLY)
+        .flatMap(SBVSPipeline.splitSDFmolecules)
 
+      logInfo("JOB_INFO: dsDockOne in is " + dsDockOne.count)
       //Keeping rest of processed poses i.e. dsOne mol poses
       if (poses == null)
         poses = dsDockOne

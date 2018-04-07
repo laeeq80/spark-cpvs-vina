@@ -79,7 +79,7 @@ private[vs] class PosePipeline(override val rdd: RDD[String]) extends SBVSPipeli
     with PoseTransforms {
 
   override def getTopPoses(topN: Int) = {
-
+   
     //Parsing id and Score in parallel and collecting data to driver
     val idAndScore = rdd.map {
       case (mol) => PosePipeline.parseIdAndScore(mol)
