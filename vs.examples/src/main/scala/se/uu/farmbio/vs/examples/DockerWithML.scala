@@ -14,7 +14,6 @@ import org.apache.spark.sql.types._
 import java.nio.file.Paths
 
 import org.apache.commons.io.FilenameUtils
-import org.apache.spark.storage.StorageLevel
 
 /**
  * @author laeeq

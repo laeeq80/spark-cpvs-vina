@@ -222,7 +222,7 @@ object ConformersWithSignsPipeline extends Serializable with Logging {
       case (lId, lPrediction) =>
         Row(rName, rPdbCode, lId, lPrediction)
     }
-
+ 
     //Creating sqlContext Using sparkContext
     val sqlContext = new org.apache.spark.sql.SQLContext(sc)
     val schema =
@@ -425,10 +425,11 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       if (effCounter >= 2) {
         dsOnePredicted = predictions
           .filter { case (sdfmol, prediction) => (prediction == Set(1.0)) }
-          .map { case (sdfmol, prediction) => sdfmol }
+          .map { case (sdfmol, prediction) => sdfmol }.persist(StorageLevel.DISK_ONLY)
         ConformersWithSignsPipeline.insertModels(receptorPath, icp, pdbCode, jdbcHostname)
         ConformersWithSignsPipeline.insertPredictions(receptorPath, pdbCode, jdbcHostname, predictions, sc)
       }
+     
     } while (effCounter < 2 && !singleCycle)
 
     if (dsOnePredicted != null) {
@@ -440,9 +441,8 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         .map {
           case (dirtyMol) => ConformerPipeline.cleanPoses(dirtyMol, true)
         }
-        .flatMap(SBVSPipeline.splitSDFmolecules)
+        .flatMap(SBVSPipeline.splitSDFmolecules).persist(StorageLevel.DISK_ONLY)
 
-      logInfo("JOB_INFO: dsDockOne in is " + dsDockOne.count)
       //Keeping rest of processed poses i.e. dsOne mol poses
       if (poses == null)
         poses = dsDockOne
