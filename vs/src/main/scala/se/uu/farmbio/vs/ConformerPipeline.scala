@@ -101,14 +101,14 @@ object ConformerPipeline extends Logging {
       sdfToPdbqtRDD = rdd.map { sdf =>
         ConformerPipeline.pipeString(
           sdf,
-          List(SparkFiles.get(obabelFileName), "-i", "sdf", "-o", "pdbqt", "--append", "Signature")).trim()
+          List(SparkFiles.get(obabelFileName), "-h", "-i", "sdf", "-o", "pdbqt", "--append", "Signature")).trim()
       }
 
     } else {
       sdfToPdbqtRDD = rdd.map { sdf =>
         ConformerPipeline.pipeString(
           sdf,
-          List(SparkFiles.get(obabelFileName), "-i", "sdf", "-o", "pdbqt")).trim()
+          List(SparkFiles.get(obabelFileName), "-h", "-i", "sdf", "-o", "pdbqt")).trim()
       }
 
     }
