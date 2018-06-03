@@ -444,7 +444,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
 
       val dsOnePredictedToDock = dsOnePredicted.mapPartitions(x => Seq(x.mkString("\n")).iterator)
 
-      val dsDockOne = ConformerPipeline.getDockingRDD(receptorPath, false, sc, dsOnePredictedToDock, true)
+      val dsDockOne = ConformerPipeline.getDockingRDD(receptorPath, false, sc, dsOnePredicted, true)
         .map {
           case (dirtyMol) => ConformerPipeline.cleanPoses(dirtyMol, true)
         }
