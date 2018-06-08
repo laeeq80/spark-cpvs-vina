@@ -342,7 +342,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       if (dsTrain == null) {
         dsTrain = dsTopAndBottom
       } else {
-        dsTrain = dsTrain.union(dsTopAndBottom).persist(StorageLevel.DISK_ONLY)
+        dsTrain = dsTrain.union(dsTopAndBottom).persist(StorageLevel.MEMORY_AND_DISK_SER)
       }
 
       logInfo("JOB_INFO: Training set size in cycle " + counter + " is " + dsTrain.count)
@@ -396,11 +396,11 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
 
       val dsZeroPredicted: RDD[(String)] = predictions
         .filter { case (sdfmol, prediction) => (prediction == Set(0.0)) }
-        .map { case (sdfmol, prediction) => sdfmol }.persist(StorageLevel.DISK_ONLY)
+        .map { case (sdfmol, prediction) => sdfmol }.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
       dsOnePredicted = predictions
         .filter { case (sdfmol, prediction) => (prediction == Set(1.0)) }
-        .map { case (sdfmol, prediction) => sdfmol }.persist(StorageLevel.DISK_ONLY)
+        .map { case (sdfmol, prediction) => sdfmol }.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
       logInfo("JOB_INFO: Number of bad mols predicted in cycle " +
         counter + " are " + dsZeroPredicted.count)
@@ -441,8 +441,6 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
 
     if (dsOnePredicted != null) {
       dsOnePredicted = dsOnePredicted.subtract(poses)
-
-      val dsOnePredictedToDock = dsOnePredicted.mapPartitions(x => Seq(x.mkString("\n")).iterator)
 
       val dsDockOne = ConformerPipeline.getDockingRDD(receptorPath, false, sc, dsOnePredicted, true)
         .map {
