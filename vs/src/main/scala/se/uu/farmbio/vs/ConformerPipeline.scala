@@ -18,6 +18,8 @@ import org.apache.spark.Logging
 
 import org.openscience.cdk.io.SDFWriter
 import org.openscience.cdk.interfaces.IAtomContainer
+import org.openscience.cdk.smiles.SmilesParser
+import org.openscience.cdk.DefaultChemObjectBuilder
 import scala.tools.nsc.doc.model.Public
 
 trait ConformerTransforms {
@@ -99,14 +101,14 @@ object ConformerPipeline extends Logging {
       sdfToPdbqtRDD = rdd.map { sdf =>
         ConformerPipeline.pipeString(
           sdf,
-          List(SparkFiles.get(obabelFileName), "-i", "sdf", "-o", "pdbqt", "--append", "Signature")).trim()
+          List(SparkFiles.get(obabelFileName), "-h", "-i", "sdf", "-o", "pdbqt", "--append", "Signature")).trim()
       }
 
     } else {
       sdfToPdbqtRDD = rdd.map { sdf =>
         ConformerPipeline.pipeString(
           sdf,
-          List(SparkFiles.get(obabelFileName), "-i", "sdf", "-o", "pdbqt")).trim()
+          List(SparkFiles.get(obabelFileName), "-h", "-i", "sdf", "-o", "pdbqt")).trim()
       }
 
     }
@@ -154,7 +156,7 @@ object ConformerPipeline extends Logging {
     writer.close
     strWriter.toString() //return the molecule
   }
-  
+
   def cleanPoses(sdfRecord: String, signExist: Boolean) = {
     val it = SBVSPipeline.CDKInit(sdfRecord)
     val strWriter = new StringWriter()
@@ -198,7 +200,8 @@ object ConformerPipeline extends Logging {
         mol.setProperty("Score", score)
 
         //Fetching title from pdbqt Name REMARK to create sdf title tag
-        val title = res.slice(res.indexOf("=") + 2, res.indexOf("x")).trim
+        var title = res.slice(res.indexOf("=") + 2, res.indexOf("x")).trim
+        if (title =="") title = "NoTitleFound"
         mol.setProperty("cdk:Title", title)
 
         //Removing pdbqt junk after getting useful stuff HEHEHE
