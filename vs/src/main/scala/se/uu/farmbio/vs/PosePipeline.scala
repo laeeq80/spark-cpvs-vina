@@ -79,10 +79,10 @@ private[vs] class PosePipeline(override val rdd: RDD[String]) extends SBVSPipeli
     with PoseTransforms {
 
   override def getTopPoses(topN: Int) = {
-    val cachedRDD = rdd.cache()
+    
 
     //Parsing id and Score in parallel and collecting data to driver
-    val idAndScore = cachedRDD.map {
+    val idAndScore = rdd.map {
       case (mol) => PosePipeline.parseIdAndScore(mol)
     }.collect()
 
@@ -97,8 +97,8 @@ private[vs] class PosePipeline(override val rdd: RDD[String]) extends SBVSPipeli
 
     //Broadcasting the top id and score and search main rdd
     //for top molecules in parallel  
-    val topMolsBroadcast = cachedRDD.sparkContext.broadcast(topMols)
-    val topPoses = cachedRDD.filter { mol =>
+    val topMolsBroadcast = rdd.sparkContext.broadcast(topMols)
+    val topPoses = rdd.filter { mol =>
       val idAndScore = PosePipeline.parseIdAndScore(mol)
       topMolsBroadcast.value
         .map(topHit => topHit == idAndScore)

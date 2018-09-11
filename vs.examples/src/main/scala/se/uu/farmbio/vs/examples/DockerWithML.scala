@@ -165,6 +165,8 @@ object DockerWithML extends Logging {
       .saveAsTextFile(params.signatureFile)
 
     sc.stop()
+    
+    System.clearProperty("spark.driver.port")
 
     val conf2 = new SparkConf()
       .setAppName("DockerWithML2")
@@ -272,7 +274,7 @@ object DockerWithML extends Logging {
 
     //destination database table
     val table = "DOCKED_LIGANDS"
-
+    
     //write data from spark dataframe to database
     df.write.mode("append").jdbc(url, table, prop)
     logInfo("JOB_INFO: Writing to DOCKED_LIGANDS")

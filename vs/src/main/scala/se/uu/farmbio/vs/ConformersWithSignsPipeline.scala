@@ -286,7 +286,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       if (dsTrain == null) {
         dsTrain = dsTopAndBottom
       } else {
-        dsTrain = dsTrain.union(dsTopAndBottom).persist(StorageLevel.DISK_ONLY)
+        dsTrain = dsTrain.union(dsTopAndBottom).persist(StorageLevel.MEMORY_AND_DISK_SER)
       }
 
       logInfo("JOB_INFO: Training set size in cycle " + counter + " is " + dsTrain.count)
@@ -341,7 +341,17 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
 
       val dsZeroPredicted: RDD[(String)] = predictions
         .filter { case (sdfmol, prediction) => (prediction == Set(0.0)) }
-        .map { case (sdfmol, prediction) => sdfmol }
+        .map { case (sdfmol, prediction) => sdfmol }.persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+      dsOnePredicted = predictions
+        .filter { case (sdfmol, prediction) => (prediction == Set(1.0)) }
+        .map { case (sdfmol, prediction) => sdfmol }.persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+      logInfo("JOB_INFO: Number of bad mols predicted in cycle " +
+        counter + " are " + dsZeroPredicted.count)
+
+      logInfo("JOB_INFO: Number of good mols predicted in cycle " +
+        counter + " are " + dsOnePredicted.count)
 
       //Step 10 Subtracting {0} mols from main dataset
       ds = ds.subtract(dsZeroPredicted).persist(StorageLevel.MEMORY_AND_DISK_SER)
@@ -367,13 +377,11 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         effCounter = 0
       }
       counter = counter + 1
-      //if (effCounter >= 2) {
-      dsOnePredicted = predictions
-        .filter { case (sdfmol, prediction) => (prediction == Set(1.0)) }
-        .map { case (sdfmol, prediction) => sdfmol }.cache()
-      ConformersWithSignsPipeline.insertModels(receptorPath, icp, pdbCode, jdbcHostname)
-      ConformersWithSignsPipeline.insertPredictions(receptorPath, pdbCode, jdbcHostname, predictions, sc)
-      //}
+      if (effCounter >= 2) {
+
+        ConformersWithSignsPipeline.insertModels(receptorPath, icp, pdbCode, jdbcHostname)
+        ConformersWithSignsPipeline.insertPredictions(receptorPath, pdbCode, jdbcHostname, predictions, sc)
+      }
     } while (effCounter < 2 && !singleCycle)
 
     if (dsOnePredicted.count() > 0) {
@@ -385,8 +393,9 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         .map {
           case (dirtyMol) => ConformerPipeline.cleanPoses(dirtyMol, true)
         }
-        .flatMap(SBVSPipeline.splitSDFmolecules)
+        .flatMap(SBVSPipeline.splitSDFmolecules).persist(StorageLevel.MEMORY_AND_DISK_SER)
 
+      logInfo("JOB_INFO: Number of Mols in dsDockOne are " + dsDockOne.count)
       //Keeping rest of processed poses i.e. dsOne mol poses
       if (poses == null)
         poses = dsDockOne
