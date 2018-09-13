@@ -275,8 +275,8 @@ object DockerWithML extends Logging {
     //destination database table
     val table = "DOCKED_LIGANDS"
     
-    //write data from spark dataframe to database
-    df.write.mode("append").jdbc(url, table, prop)
+    //write data from spark dataframe to database, coalesce used to get rid of skewness
+    df.coalesce(100).write.mode("append").jdbc(url, table, prop)
     logInfo("JOB_INFO: Writing to DOCKED_LIGANDS")
     df.printSchema()
 
