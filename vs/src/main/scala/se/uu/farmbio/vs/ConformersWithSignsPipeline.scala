@@ -275,7 +275,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       //Step 5 and 6 Computing dsTopAndBottom
       val parseScoreRDD = dsDock.map(PosePipeline.parseScore).persist(StorageLevel.MEMORY_ONLY)
       val parseScoreHistogram = parseScoreRDD.histogram(10)
-
+      
       val dsTopAndBottom = dsDock.map {
         case (mol) =>
           val score = PosePipeline.parseScore(mol)
@@ -377,11 +377,11 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         effCounter = 0
       }
       counter = counter + 1
-      if (effCounter >= 2) {
+      //if (effCounter >= 2) {
 
         ConformersWithSignsPipeline.insertModels(receptorPath, icp, pdbCode, jdbcHostname)
         ConformersWithSignsPipeline.insertPredictions(receptorPath, pdbCode, jdbcHostname, predictions, sc)
-      }
+      //}
     } while (effCounter < 2 && !singleCycle)
 
     if (dsOnePredicted != null) {
