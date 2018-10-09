@@ -9,7 +9,7 @@ import org.openscience.cdk.interfaces.IAtomContainer
 import org.openscience.cdk.io.iterator.IteratingSDFReader
 
 import scopt.OptionParser
-import se.uu.farmbio.vs.{ MLlibSVM, SGUtils_Serial }
+import se.uu.farmbio.vs.{ MLlibSVM, SGUtils_Serial, PosePipeline, ConformersWithSignsPipeline, ConformerPipeline }
 
 import se.uu.it.cp.InductiveClassifier
 import org.apache.spark.Logging
@@ -19,23 +19,28 @@ import org.apache.spark.SparkContext._
 import scopt.OptionParser
 import se.uu.farmbio.vs.SBVSPipeline
 import java.io.PrintWriter
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.types.StructType
+import java.nio.file.Paths
+import org.apache.spark.sql.types.StructField
+import org.apache.commons.io.FilenameUtils
 
 /**
  * @author laeeq
  */
 
-object ExternalEfficiency {
+object Validation {
 
   case class Arglist(
     master:         String = null,
     conformersFile: String = null,
     sig2IdPath:     String = null,
-    sampleFile:       String = null)
+    sampleFile:     String = null)
 
   def main(args: Array[String]) {
     val defaultParams = Arglist()
-    val parser = new OptionParser[Arglist]("ExternalEfficiency") {
-      head("Computing Efficiency on External Dataset")
+    val parser = new OptionParser[Arglist]("Validation") {
+      head("Validation BY P-Values")
       opt[String]("master")
         .text("spark master")
         .action((x, c) => c.copy(master = x))
@@ -90,22 +95,14 @@ object ExternalEfficiency {
     val svmModel = loadModel()
 
     //Predict New molecule(s)
-    val predictions = newSigns.map { case (sdfMols, features) => (features, svmModel.predict(features.toArray, 0.2)) }
+    val p_Values = newSigns.map { case (sdfMols, features) => (svmModel.mondrianPv(features.toArray)) }
+  
+    //Update Predictions to the Prediction Table
+    val pw = new PrintWriter("data/1B8O_p-values.csv")
+    p_Values.foreach( vec =>
+        pw.write( vec.toString.drop( 7 ).dropRight( 1 ) + "\n" ))
+    pw.close
 
-    val ZeroCount = predictions
-        .filter { case (sdfmol, prediction) => (prediction == Set(0.0)) }.size
-    println ("Zero Count is " + ZeroCount)
-        
-    val OneCount = predictions
-        .filter { case (sdfmol, prediction) => (prediction == Set(1.0)) }.size
-    println ("One Count is " + OneCount)
-        
-    println ("Total Predictions Count is " + predictions.size)    
-    
-    val Eff = (ZeroCount + OneCount)/predictions.size.toDouble
-    
-    println ("The efficiency of model using External test set is " + Eff)
-   
   }
 
   def loadModel() = {

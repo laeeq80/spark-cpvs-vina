@@ -76,14 +76,14 @@ object StandalonePrediction {
     //Unit sent as carry, later we can add any type required
     val iAtomArrayWithFakeCarry = iAtomArray.map { case x => (Unit, x) }
 
-    //Generate Signature(in vector form) of New Molecule(s)
+    //Generate Signature(in vector form) of New Molecule(s) 
     val newSigns = SGUtils_Serial.atoms2LP_carryData(iAtomArrayWithFakeCarry, oldSig2ID, 1, 3)
 
     //Load Model
     val svmModel = loadModel()
 
     //Predict New molecule(s)
-    val predictions = newSigns.map { case (sdfMols, features) => (features, svmModel.predict(features.toArray, 0.5)) }
+    val predictions = newSigns.map { case (sdfMols, features) => (features, svmModel.predict(features.toArray, 0.2)) }
     
     //Update Predictions to the Prediction Table
     val pw = new PrintWriter(params.filePath)
@@ -101,7 +101,7 @@ object StandalonePrediction {
     var model: InductiveClassifier[MLlibSVM, LabeledPoint] = null
     if (!(connection.isClosed())) {
 
-      val sqlRead = connection.prepareStatement("SELECT r_model FROM MODELS")
+      val sqlRead = connection.prepareStatement("SELECT r_model FROM MODELS WHERE r_pdbCode='1QCF'")
       val rs = sqlRead.executeQuery()
       rs.next()
 
