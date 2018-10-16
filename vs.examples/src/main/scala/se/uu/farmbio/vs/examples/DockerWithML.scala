@@ -270,7 +270,7 @@ object DockerWithML extends Logging {
     prop.setProperty("password", "2264421_root")
 
     //jdbc mysql url - destination database is named "db_profile"
-    val url = "jdbc:mysql://" + params.jdbcHostname + ":3306/db_profile"
+    val url = "jdbc:mysql://" + params.jdbcHostname + ":3306/db_external"
 
     //destination database table
     val table = "DOCKED_LIGANDS"
