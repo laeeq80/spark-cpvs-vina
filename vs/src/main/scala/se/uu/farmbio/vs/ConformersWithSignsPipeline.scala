@@ -21,6 +21,7 @@ import se.uu.it.cp.{ ICP, InductiveClassifier }
 
 import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, ObjectOutputStream, StringWriter }
 import scala.math.round
+import java.io.File
 
 trait ConformersWithSignsTransforms {
   def dockWithML(
@@ -107,6 +108,8 @@ object ConformersWithSignsPipeline extends Serializable with Logging {
       .zipWithIndex()
       .filter { case ((mol, score), index) => index < topN }
       .map { case ((mol, score), index) => mol }
+      
+    top.saveAsTextFile("data/top.sdf")  
 
     val bottom = molAndScore.sortBy { case (mol, score) => -score }
       .zipWithIndex()
@@ -307,15 +310,12 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       val dsInitToDock = dsInit.mapPartitions(x => Seq(x.mkString("\n")).iterator)
 
       //Step 2
-      //Docking the sampled dataset
-      val dsDock = ConformerPipeline
-        .getDockingRDD(receptorPath, dockTimePerMol = false, sc, dsInitToDock, true)
-        .map {
-          case (dirtyMol) => ConformerPipeline.cleanPoses(dirtyMol, true)
-        }
-        .flatMap(SBVSPipeline.splitSDFmolecules).persist(StorageLevel.DISK_ONLY)
+      //Mocking the sampled dataset. We already have scores, docking not required
+      val dsDock = dsInit
+      logInfo("\nJOB_INFO: cycle " + counter
+        + "   ################################################################\n")
 
-      logInfo("JOB_INFO: Docking Completed in cycle " + counter)
+      logInfo("JOB_INFO: dsInit in cycle " + counter + " is " + dsInit.count)
 
       //Step 3
       //Subtract the sampled molecules from main dataset
@@ -383,7 +383,7 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
       val svm = new MLlibSVM(properTraining.persist(StorageLevel.MEMORY_AND_DISK_SER), numIterations)
       //SVM based ICP Classifier (our model)
       val icp = ICP.trainClassifier(svm, nOfClasses = 2, calibration.collect)
-
+     
       lpDsTrain.unpersist()
       properTraining.unpersist()
 
@@ -432,30 +432,24 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         effCounter = 0
       }
       counter = counter + 1
-      if (effCounter >= 2) {
+      //if (effCounter >= 2) {
         ConformersWithSignsPipeline.insertModels(receptorPath, icp, pdbCode, jdbcHostname)
         ConformersWithSignsPipeline.insertPredictions(receptorPath, pdbCode, jdbcHostname, predictions, sc)
-      }
+      //}
 
     } while (effCounter < 2 && !singleCycle)
 
-    if (dsOnePredicted != null) {
-      dsOnePredicted = dsOnePredicted.subtract(poses)
+    //Docking rest of the dsOne mols
+    val dsDockOne = dsOnePredicted.subtract(poses).cache()
+    logInfo("JOB_INFO: Number of mols in dsDockOne are " + dsDockOne.count)
 
-      val dsDockOne = ConformerPipeline.getDockingRDD(receptorPath, false, sc, dsOnePredicted, true)
-        .map {
-          case (dirtyMol) => ConformerPipeline.cleanPoses(dirtyMol, true)
-        }
-        .flatMap(SBVSPipeline.splitSDFmolecules).persist(StorageLevel.DISK_ONLY)
+    //Keeping rest of processed poses i.e. dsOne mol poses
+    if (poses == null)
+      poses = dsDockOne
+    else
+      poses = poses.union(dsDockOne)
 
-      logInfo("JOB_INFO: Number of molecules in dsDockOne are " + dsDockOne.count)
-
-      //Keeping rest of processed poses i.e. dsOne mol poses
-      if (poses == null)
-        poses = dsDockOne
-      else
-        poses = poses.union(dsDockOne)
-    }
+    logInfo("JOB_INFO: Total number of docked mols are " + poses.count)
     new PosePipeline(poses)
   }
 

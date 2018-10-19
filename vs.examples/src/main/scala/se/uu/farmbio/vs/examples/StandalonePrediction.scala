@@ -20,7 +20,6 @@ import se.uu.it.cp.InductiveClassifier
 object StandalonePrediction {
 
   case class Arglist(
-    master:         String = null,
     conformersFile: String = null,
     sig2IdPath:     String = null,
     filePath:       String = null)
@@ -83,7 +82,7 @@ object StandalonePrediction {
     val svmModel = loadModel()
 
     //Predict New molecule(s)
-    val predictions = newSigns.map { case (sdfMols, features) => (features, svmModel.predict(features.toArray, 0.5)) }
+    val predictions = newSigns.map { case (sdfMols, features) => (features, svmModel.predict(features.toArray, 0.2)) }
     
     //Update Predictions to the Prediction Table
     val pw = new PrintWriter(params.filePath)

@@ -186,7 +186,8 @@ object DockerWithML extends Logging {
       classOf[Array[String]],
       classOf[scala.collection.mutable.WrappedArray$ofRef],
       classOf[scala.reflect.ClassTag$$anon$1],
-      classOf[java.lang.Class[_]]))
+      classOf[java.lang.Class[_]]
+      ))
 
     val sc2 = new SparkContext(conf2)
     sc2.hadoopConfiguration.set("se.uu.farmbio.parsers.SDFRecordReader.size", params.size)
