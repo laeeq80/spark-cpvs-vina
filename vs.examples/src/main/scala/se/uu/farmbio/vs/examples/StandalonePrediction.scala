@@ -100,7 +100,7 @@ object StandalonePrediction {
     var model: InductiveClassifier[MLlibSVM, LabeledPoint] = null
     if (!(connection.isClosed())) {
 
-      val sqlRead = connection.prepareStatement("SELECT r_model FROM MODELS")
+      val sqlRead = connection.prepareStatement("SELECT r_model FROM MODELS WHERE r_pdbCode='1B8O'")
       val rs = sqlRead.executeQuery()
       rs.next()
 
@@ -108,7 +108,7 @@ object StandalonePrediction {
       val modelBaip = new ByteArrayInputStream(modelStream)
       val modelOis = new ObjectInputStream(modelBaip)
       model = modelOis.readObject().asInstanceOf[InductiveClassifier[MLlibSVM, LabeledPoint]]
-
+      
       rs.close
       sqlRead.close
       connection.close()

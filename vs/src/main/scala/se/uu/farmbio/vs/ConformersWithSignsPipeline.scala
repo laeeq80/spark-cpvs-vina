@@ -88,6 +88,7 @@ object ConformersWithSignsPipeline extends Serializable with Logging {
     strWriter.toString() //return the molecule
 
   }
+  
 
   private def getLabeledTopAndBottom(poses: RDD[String], dsSize: Int, topPer: Float, bottomPer: Float): RDD[String] = {
     //what is top % of dsSize
@@ -101,16 +102,14 @@ object ConformersWithSignsPipeline extends Serializable with Logging {
     //Get scores with mols
     val molAndScore = poses.map {
       case (mol) => (mol, PosePipeline.parseScore(mol))
-    }
-
+    }  
+    
     //Sort whole DsInit by Score
     val top = molAndScore.sortBy { case (mol, score) => score }
       .zipWithIndex()
       .filter { case ((mol, score), index) => index < topN }
       .map { case ((mol, score), index) => mol }
-      
-    top.saveAsTextFile("data/top.sdf")  
-
+    
     val bottom = molAndScore.sortBy { case (mol, score) => -score }
       .zipWithIndex()
       .filter { x => x._2 < bottomN }
@@ -329,13 +328,17 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         poses = poses.union(dsDock)
       }
 
+      
       //Step 5 and 6 Computing dsTopAndBottom and label it
       if (dsTopAndBottom == null) {
         dsTopAndBottom = ConformersWithSignsPipeline.getLabeledTopAndBottom(dsDock, dsInitSize, topPer, bottomPer)
       } else {
         dsTopAndBottom = ConformersWithSignsPipeline.getLabeledTopAndBottom(dsDock, dsIncreSize, topPer, bottomPer)
       }
-
+      
+      val dsTopAndBottomArray = dsTopAndBottom.collect()
+      dsTopAndBottom = sc.parallelize(dsTopAndBottomArray, 4)
+      
       logInfo("JOB_INFO: dsTopAndBottom in cycle " + counter + " is " + dsTopAndBottom.count)
 
       //Step 7 Union dsTrain and dsTopAndBottom
