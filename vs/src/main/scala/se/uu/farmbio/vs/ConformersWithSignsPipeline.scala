@@ -328,7 +328,6 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
         poses = poses.union(dsDock)
       }
 
-      
       //Step 5 and 6 Computing dsTopAndBottom and label it
       if (dsTopAndBottom == null) {
         dsTopAndBottom = ConformersWithSignsPipeline.getLabeledTopAndBottom(dsDock, dsInitSize, topPer, bottomPer)
