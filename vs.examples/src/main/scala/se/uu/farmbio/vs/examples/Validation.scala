@@ -98,7 +98,7 @@ object Validation {
     val p_Values = newSigns.map { case (sdfMols, features) => (svmModel.mondrianPv(features.toArray)) }
   
     //Update Predictions to the Prediction Table
-    val pw = new PrintWriter("data/1B8O_p-values.csv")
+    val pw = new PrintWriter("data/1RT2_200KMols_p-values.csv")
     p_Values.foreach( vec =>
         pw.write( vec.toString.drop( 7 ).dropRight( 1 ) + "\n" ))
     pw.close
@@ -115,7 +115,7 @@ object Validation {
     var model: InductiveClassifier[MLlibSVM, LabeledPoint] = null
     if (!(connection.isClosed())) {
 
-      val sqlRead = connection.prepareStatement("SELECT r_model FROM MODELS WHERE r_pdbCode='1B8O'")
+      val sqlRead = connection.prepareStatement("SELECT r_model FROM MODELS WHERE r_pdbCode='1RT2'")
       val rs = sqlRead.executeQuery()
       rs.next()
 
