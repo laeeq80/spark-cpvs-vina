@@ -331,12 +331,16 @@ private[vs] class ConformersWithSignsPipeline(override val rdd: RDD[String])
 
       //Step 5 and 6 Computing dsTopAndBottom and label it
       if (dsTopAndBottom == null) {
-        dsTopAndBottom = ConformersWithSignsPipeline.getLabeledTopAndBottom(dsDock, dsInitSize, topPer, bottomPer)
+        dsTopAndBottom = ConformersWithSignsPipeline.getLabeledTopAndBottom(dsDock, dsInitSize, topPer, bottomPer).persist(StorageLevel.MEMORY_AND_DISK_SER)
       } else {
-        dsTopAndBottom = ConformersWithSignsPipeline.getLabeledTopAndBottom(dsDock, dsIncreSize, topPer, bottomPer)
+        dsTopAndBottom = ConformersWithSignsPipeline.getLabeledTopAndBottom(dsDock, dsIncreSize, topPer, bottomPer).persist(StorageLevel.MEMORY_AND_DISK_SER)
       }
-
+      
+      val dsTopAndBottomArray = dsTopAndBottom.collect()
       logInfo("JOB_INFO: dsTopAndBottom in cycle " + counter + " is " + dsTopAndBottom.count)
+      
+      //Assigning value to dsTopAndBottom so it lives during serialization
+      dsTopAndBottom = sc.parallelize(dsTopAndBottomArray, 560)
 
       //Step 7 Union dsTrain and dsTopAndBottom
       if (dsTrain == null) {
