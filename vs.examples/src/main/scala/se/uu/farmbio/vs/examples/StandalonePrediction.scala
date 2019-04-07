@@ -84,6 +84,21 @@ object StandalonePrediction {
 
     //Predict New molecule(s)
     val predictions = newSigns.map { case (sdfMols, features) => (features, svmModel.predict(features.toArray, 0.2)) }
+    var singletonCount :Double = 0.0
+    var totalCount:Double = 0.0
+ 
+    predictions.foreach {
+        case (sdfmol, prediction) =>
+          if (prediction.size == 1) {
+            singletonCount += 1.0
+          }
+          totalCount += 1.0
+      }
+    
+    val eff = (singletonCount / totalCount) * 100 
+    
+    println ("SingletonCount is " + singletonCount + " and totalCount is " + totalCount )
+    println ("External Efficiency is " + eff)
     
     //Update Predictions to the Prediction Table
     val pw = new PrintWriter(params.filePath)
@@ -101,7 +116,7 @@ object StandalonePrediction {
     var model: InductiveClassifier[MLlibSVM, LabeledPoint] = null
     if (!(connection.isClosed())) {
 
-      val sqlRead = connection.prepareStatement("SELECT r_model FROM MODELS WHERE r_pdbCode='1RT2'")
+      val sqlRead = connection.prepareStatement("SELECT r_model FROM MODELS WHERE r_pdbCode='1B8O'")
       val rs = sqlRead.executeQuery()
       rs.next()
 
