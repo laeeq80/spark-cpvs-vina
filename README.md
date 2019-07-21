@@ -28,4 +28,4 @@ If you have scala version problems follow this procedure:
 
 Now you can get familiar with Spark-CPVS giving a look to the examples, and running them in Scala IDE. The main example is DockerWithML. 
 In the data directory you can find an example SDF as well as a receptor file. You will need a larger sdf file and relevant top scores. 
-Remember that in order to run examples you need to specify arguments and OE_LICENSE environment variable through Run Configurations.
+Remember that in order to run examples you need to specify arguments through Run Configurations.
