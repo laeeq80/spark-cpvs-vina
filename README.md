@@ -9,9 +9,7 @@ On command line, perform the following command in the vs project directory
 
 `mvn clean install -DskipTests`
 
-This will install vs project in local maven repositories
-	
-Since OpenEye libraries are used under the hood, you need to own and a OpenEye license in order to run this. Therefore, you need to set a OE_LICENSE environment variable that points to the license, in your system to run the code in this repository.	
+This will install vs project in local maven repositories	
 
 ### Import vs.examples project in Scala IDE ###
 
