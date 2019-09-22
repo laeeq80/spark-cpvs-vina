@@ -7,7 +7,6 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import se.uu.farmbio.parsers.SDFInputFormat
-import se.uu.farmbio.parsers.PDBInputFormat
 import se.uu.farmbio.parsers.SmilesInputFormat
 
 import org.openscience.cdk.io.MDLV2000Reader
